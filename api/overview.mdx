@@ -9,14 +9,16 @@ description: "Programmatic API for the Vulcn engine"
 npm install @vulcn/engine
 ```
 
-## Core Classes
+## Architecture
+
+The engine exposes two main systems:
+
+- **DriverManager** - Handles recording and running via drivers
+- **PluginManager** - Handles payloads and detection via plugins
 
 <CardGroup cols={2}>
-  <Card title="Recorder" icon="circle-dot" href="/api/recorder">
-    Record browser sessions programmatically
-  </Card>
-  <Card title="Runner" icon="play" href="/api/runner">
-    Execute security tests on sessions
+  <Card title="DriverManager" icon="car" href="/api/driver-manager">
+    Manage recording and running drivers
   </Card>
   <Card title="PluginManager" icon="plug" href="/api/plugin-manager">
     Load and manage plugins
@@ -30,104 +32,128 @@ npm install @vulcn/engine
 
 ```typescript
 import {
-  Recorder,
-  Runner,
+  DriverManager,
   PluginManager,
-  parseSession,
-  stringifySession,
+  driverManager,
+  pluginManager,
 } from "@vulcn/engine";
-import detectXss from "@vulcn/plugin-detect-xss";
+import browserDriver from "@vulcn/driver-browser";
 import payloadsPlugin from "@vulcn/plugin-payloads";
+import detectXss from "@vulcn/plugin-detect-xss";
+
+// Register browser driver
+driverManager.register(browserDriver);
+
+// Set up plugins
+pluginManager.addPlugin(payloadsPlugin, { builtin: true });
+pluginManager.addPlugin(detectXss, { detectDialogs: true });
+await pluginManager.initialize();
 
 // Record a session
-const recording = await Recorder.start("https://example.com", {
+const handle = await driverManager.startRecording("browser", {
+  startUrl: "https://example.com",
   browser: "chromium",
   headless: false,
 });
 
-// Wait for user to finish interacting
-// ...
-
-const session = await recording.stop();
-
-// Save session
-const yaml = stringifySession(session);
-await fs.writeFile("session.vulcn.yml", yaml);
-
-// Set up plugins
-const manager = new PluginManager();
-manager.addPlugin(payloadsPlugin, { builtin: true });
-manager.addPlugin(detectXss, { detectDialogs: true });
-await manager.initialize();
+// Wait for user to finish interacting...
+const session = await handle.stop();
 
 // Run security tests
-const result = await Runner.execute(
-  session,
-  {
-    headless: true,
-    onFinding: (finding) => {
-      console.log(`Found: ${finding.title}`);
-    },
+const result = await driverManager.execute(session, pluginManager, {
+  headless: true,
+  onFinding: (finding) => {
+    console.log(`Found: ${finding.title}`);
   },
-  { pluginManager: manager },
-);
+});
 
 console.log(`Tested ${result.payloadsTested} payloads`);
 console.log(`Found ${result.findings.length} vulnerabilities`);
-
-// Cleanup
-await manager.destroy();
 ```
 
 ## Module Exports
 
+### Driver System
+
 ```typescript
-// Classes
-export { Recorder } from "./recorder";
-export { Runner } from "./runner";
-export { PluginManager } from "./plugin-manager";
+// Driver manager
+export { DriverManager, driverManager } from "./driver-manager";
+export { DRIVER_API_VERSION } from "./driver-types";
 
-// Session utilities
-export { parseSession, stringifySession } from "./session";
-
-// Types
+// Driver types
 export type {
+  VulcnDriver,
+  RecorderDriver,
+  RunnerDriver,
+  RecordingHandle,
   Session,
   Step,
-  Finding,
+  RunContext,
   RunResult,
+  LoadedDriver,
+  DriverSource,
+} from "./driver-types";
+```
+
+### Plugin System
+
+```typescript
+// Plugin manager
+export { PluginManager, pluginManager } from "./plugin-manager";
+export { PLUGIN_API_VERSION } from "./plugin-types";
+
+// Plugin types
+export type {
+  VulcnPlugin,
+  PluginHooks,
+  PluginContext,
+  RecordContext,
+  DetectContext,
+  LoadedPlugin,
+  PluginSource,
+} from "./plugin-types";
+```
+
+### Payload Types
+
+```typescript
+export type {
+  RuntimePayload,
+  PayloadCategory,
+  PayloadSource,
+  CustomPayload,
+} from "./payload-types";
+```
+
+### Core Types
+
+```typescript
+export type {
+  Finding,
   BrowserType,
   RecorderOptions,
   RunnerOptions,
-  VulcnPlugin,
-  PluginContext,
-  RunContext,
-  DetectContext,
-  RuntimePayload,
-  PayloadCategory,
 } from "./types";
 ```
 
-## Browser Support
+## Legacy Exports
 
-Vulcn uses [Playwright](https://playwright.dev) for browser automation:
-
-| Browser  | Support         |
-| -------- | --------------- |
-| Chromium | ✅ Full support |
-| Firefox  | ✅ Full support |
-| WebKit   | ✅ Full support |
-
-Install browsers:
+<Warning>
+  The following exports are deprecated and will be removed in v1.0. Import from
+  `@vulcn/driver-browser` instead.
+</Warning>
 
 ```typescript
-import { installBrowsers } from "@vulcn/engine";
+// DEPRECATED - use DriverManager instead
+export { Recorder } from "./recorder";
+export { Runner } from "./runner";
 
-// Install Chromium only
-await installBrowsers({ chromium: true });
+// DEPRECATED - use Session from driver-types
+export { parseSession, serializeSession } from "./session";
+export type { Session as LegacySession, Step as LegacyStep } from "./session";
 
-// Install all
-await installBrowsers({ all: true });
+// DEPRECATED - use @vulcn/driver-browser
+export { launchBrowser, installBrowsers, checkBrowsers } from "./browser";
 ```
 
 ## Error Handling
@@ -136,12 +162,12 @@ All async methods may throw:
 
 ```typescript
 try {
-  const result = await Runner.execute(session, options);
+  const result = await driverManager.execute(session, pluginManager);
 } catch (error) {
-  if (error.name === "VulcnRecordingError") {
-    console.error("Recording failed:", error.message);
-  } else if (error.name === "VulcnRunnerError") {
-    console.error("Runner failed:", error.message);
+  if (error.message.includes("Driver")) {
+    console.error("Driver error:", error.message);
+  } else if (error.message.includes("Plugin")) {
+    console.error("Plugin error:", error.message);
   } else {
     throw error;
   }
@@ -157,7 +183,12 @@ import type {
   Session,
   Step,
   Finding,
+  VulcnDriver,
   VulcnPlugin,
   RuntimePayload,
 } from "@vulcn/engine";
 ```
+
+<Card title="DriverManager API" icon="car" href="/api/driver-manager">
+  Full DriverManager reference
+</Card>

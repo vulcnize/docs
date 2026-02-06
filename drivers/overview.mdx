@@ -1,0 +1,166 @@
+---
+title: "Driver System"
+description: "Vulcn's driver-based architecture for recording and replaying different target types"
+---
+
+## Overview
+
+Vulcn v0.3.0 introduces a **driver-based architecture** that makes the recording and replay system modular and extensible. Instead of being limited to web applications, Vulcn can now support multiple recording targets through drivers.
+
+```mermaid
+flowchart TB
+    subgraph Engine["@vulcn/engine"]
+        DM[DriverManager]
+        PM[PluginManager]
+    end
+
+    subgraph Drivers["Recording Drivers"]
+        Browser["@vulcn/driver-browser"]
+        API["@vulcn/driver-api (coming)"]
+        CLI["@vulcn/driver-cli (coming)"]
+    end
+
+    subgraph Plugins["Detection Plugins"]
+        Payloads["@vulcn/plugin-payloads"]
+        XSS["@vulcn/plugin-detect-xss"]
+        Reflection["@vulcn/plugin-detect-reflection"]
+    end
+
+    DM --> Browser
+    DM --> API
+    DM --> CLI
+    PM --> Payloads
+    PM --> XSS
+    PM --> Reflection
+```
+
+## What is a Driver?
+
+A driver is a package that provides:
+
+1. **RecorderDriver** - Captures interactions for a specific target type
+2. **RunnerDriver** - Replays sessions with payload injection
+
+Each driver defines its own step types. For example, the browser driver defines:
+
+- `browser.navigate` - Navigate to a URL
+- `browser.click` - Click an element
+- `browser.input` - Type into a form field
+- `browser.keypress` - Press a key
+
+## Available Drivers
+
+<CardGroup cols={3}>
+  <Card title="Browser" icon="globe" href="/drivers/browser">
+    Web application testing with Playwright
+  </Card>
+  <Card title="API" icon="code" href="/drivers/api">
+    HTTP/REST API testing (coming soon)
+  </Card>
+  <Card title="CLI" icon="terminal" href="/drivers/cli">
+    Command-line tool testing (coming soon)
+  </Card>
+</CardGroup>
+
+## Session Format
+
+Sessions now include a `driver` field to indicate which driver recorded them:
+
+```yaml
+name: Login Test
+driver: browser
+driverConfig:
+  browser: chromium
+  startUrl: https://example.com/login
+  viewport:
+    width: 1280
+    height: 720
+steps:
+  - id: step_001
+    type: browser.navigate
+    url: https://example.com/login
+    timestamp: 0
+  - id: step_002
+    type: browser.input
+    selector: input[name="username"]
+    value: testuser
+    injectable: true
+    timestamp: 1500
+metadata:
+  recordedAt: "2026-02-06T12:00:00Z"
+```
+
+<Note>
+  Step types are namespaced (`browser.input` instead of just `input`) to avoid
+  conflicts between drivers.
+</Note>
+
+## Driver API
+
+Drivers implement two interfaces:
+
+### RecorderDriver
+
+```typescript
+interface RecorderDriver {
+  start(
+    config: Record<string, unknown>,
+    options: RecordOptions,
+  ): Promise<RecordingHandle>;
+}
+
+interface RecordingHandle {
+  stop(): Promise<Session>;
+  abort(): Promise<void>;
+  getSteps(): Step[];
+  addStep(step: Omit<Step, "id" | "timestamp">): void;
+}
+```
+
+### RunnerDriver
+
+```typescript
+interface RunnerDriver {
+  execute(session: Session, ctx: RunContext): Promise<RunResult>;
+}
+```
+
+## Using Drivers
+
+### With CLI
+
+```bash
+# Record with browser driver (default)
+vulcn record https://example.com
+
+# Specify driver explicitly
+vulcn record https://example.com --driver browser
+```
+
+### Programmatically
+
+```typescript
+import { DriverManager, driverManager } from "@vulcn/engine";
+import browserDriver from "@vulcn/driver-browser";
+
+// Register driver
+driverManager.register(browserDriver);
+
+// Start recording
+const handle = await driverManager.startRecording("browser", {
+  startUrl: "https://example.com",
+  browser: "chromium",
+});
+
+// ... user interacts ...
+
+const session = await handle.stop();
+```
+
+## Creating Custom Drivers
+
+See [Creating Drivers](/drivers/creating-drivers) for a complete guide on building your own driver.
+
+<Card title="Browser Driver" icon="globe" href="/drivers/browser">
+  Learn about the browser driver and its configuration options
+</Card>

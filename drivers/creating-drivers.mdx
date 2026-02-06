@@ -1,0 +1,343 @@
+---
+title: "Creating Drivers"
+description: "Build custom drivers to extend Vulcn to new recording targets"
+---
+
+## Overview
+
+Drivers extend Vulcn to support new recording targets beyond web browsers. This guide walks you through creating a custom driver.
+
+## Driver Structure
+
+A complete driver package:
+
+```
+my-driver/
+├── src/
+│   ├── index.ts      # Driver definition
+│   ├── recorder.ts   # RecorderDriver implementation
+│   └── runner.ts     # RunnerDriver implementation
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+## Step 1: Define the Driver
+
+```typescript
+// src/index.ts
+import { z } from "zod";
+import type { VulcnDriver, RecorderDriver, RunnerDriver } from "@vulcn/engine";
+
+// Configuration schema
+const configSchema = z.object({
+  target: z.string(),
+  timeout: z.number().default(5000),
+});
+
+export type MyDriverConfig = z.infer<typeof configSchema>;
+
+// Step types for this driver
+export const STEP_TYPES = ["mydriver.action", "mydriver.verify"] as const;
+
+// Recorder implementation
+const recorder: RecorderDriver = {
+  async start(config, options) {
+    const parsedConfig = configSchema.parse(config);
+    // ... implementation
+  },
+};
+
+// Runner implementation
+const runner: RunnerDriver = {
+  async execute(session, ctx) {
+    // ... implementation
+  },
+};
+
+// Complete driver
+const driver: VulcnDriver = {
+  name: "mydriver",
+  version: "1.0.0",
+  apiVersion: 1,
+  description: "My custom driver",
+  configSchema,
+  stepTypes: [...STEP_TYPES],
+  recorder,
+  runner,
+};
+
+export default driver;
+```
+
+## Step 2: Implement the Recorder
+
+The recorder captures user interactions:
+
+```typescript
+// src/recorder.ts
+import type {
+  RecordingHandle,
+  Session,
+  Step,
+  RecordOptions,
+} from "@vulcn/engine";
+import type { MyDriverConfig } from "./index";
+
+export async function startRecording(
+  config: MyDriverConfig,
+  options: RecordOptions,
+): Promise<RecordingHandle> {
+  const steps: Step[] = [];
+  let stepCounter = 0;
+  const startTime = Date.now();
+
+  // Generate unique step IDs
+  const generateStepId = () => {
+    stepCounter++;
+    return `step_${String(stepCounter).padStart(3, "0")}`;
+  };
+
+  // Set up your recording mechanism here
+  // For example: event listeners, proxies, hooks, etc.
+
+  return {
+    async stop(): Promise<Session> {
+      // Clean up and return session
+      return {
+        name: `Recording ${new Date().toISOString()}`,
+        driver: "mydriver",
+        driverConfig: config,
+        steps,
+        metadata: {
+          recordedAt: new Date().toISOString(),
+          version: "1",
+        },
+      };
+    },
+
+    async abort(): Promise<void> {
+      // Clean up without saving
+    },
+
+    getSteps(): Step[] {
+      return [...steps];
+    },
+
+    addStep(step: Omit<Step, "id" | "timestamp">): void {
+      steps.push({
+        ...step,
+        id: generateStepId(),
+        timestamp: Date.now() - startTime,
+      } as Step);
+    },
+  };
+}
+```
+
+## Step 3: Implement the Runner
+
+The runner replays sessions with payload injection:
+
+```typescript
+// src/runner.ts
+import type { Session, RunContext, RunResult, Finding } from "@vulcn/engine";
+
+export async function executeSession(
+  session: Session,
+  ctx: RunContext,
+): Promise<RunResult> {
+  const startTime = Date.now();
+  const errors: string[] = [];
+  let payloadsTested = 0;
+
+  // Get payloads from plugin manager
+  const payloads = ctx.payloads;
+
+  // Find injectable steps
+  const injectableSteps = session.steps.filter(
+    (step) => step.type === "mydriver.action" && step.injectable,
+  );
+
+  // For each injectable step, test with each payload
+  for (const step of injectableSteps) {
+    for (const payloadSet of payloads) {
+      for (const payload of payloadSet.payloads) {
+        try {
+          // Execute step with payload
+          const finding = await executeWithPayload(session, step, payload);
+
+          if (finding) {
+            ctx.addFinding(finding);
+          }
+
+          payloadsTested++;
+        } catch (err) {
+          errors.push(`${step.id}: ${String(err)}`);
+        }
+      }
+    }
+  }
+
+  return {
+    findings: ctx.findings,
+    stepsExecuted: session.steps.length,
+    payloadsTested,
+    duration: Date.now() - startTime,
+    errors,
+  };
+}
+
+async function executeWithPayload(
+  session: Session,
+  targetStep: Step,
+  payload: string,
+): Promise<Finding | undefined> {
+  // 1. Replay steps up to target
+  // 2. Inject payload at target step
+  // 3. Check for vulnerability indicators
+  // 4. Return finding if vulnerable
+
+  return undefined;
+}
+```
+
+## Step 4: Package Configuration
+
+```json
+{
+  "name": "@myorg/driver-mydriver",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "peerDependencies": {
+    "@vulcn/engine": ">=0.3.0"
+  }
+}
+```
+
+## Step 5: Register the Driver
+
+Users register your driver via config:
+
+```yaml
+# vulcn.config.yml
+drivers:
+  - name: "@myorg/driver-mydriver"
+    config:
+      target: "my-target"
+```
+
+Or programmatically:
+
+```typescript
+import { driverManager } from "@vulcn/engine";
+import myDriver from "@myorg/driver-mydriver";
+
+driverManager.register(myDriver);
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Namespace Step Types" icon="tag">
+    Always prefix step types with your driver name to avoid conflicts:
+    - ✅ `mydriver.click`
+    - ❌ `click`
+  </Accordion>
+
+<Accordion title="Validate Configuration" icon="shield-check">
+  Use Zod schemas to validate driver configuration and provide clear error
+  messages.
+</Accordion>
+
+<Accordion title="Mark Injectable Steps" icon="syringe">
+  Clearly identify which steps are injection points using an `injectable`
+  property.
+</Accordion>
+
+<Accordion title="Handle Errors Gracefully" icon="circle-exclamation">
+  Catch and report errors per-step rather than failing the entire run.
+</Accordion>
+
+  <Accordion title="Report Progress" icon="chart-line">
+    Use `ctx.options.onStepComplete` to report progress during long runs.
+  </Accordion>
+</AccordionGroup>
+
+## Example: API Driver
+
+Here's a sketch of what an API driver might look like:
+
+```typescript
+const apiDriver: VulcnDriver = {
+  name: "api",
+  version: "1.0.0",
+  stepTypes: ["api.request", "api.assert"],
+
+  recorder: {
+    async start(config) {
+      // Start HTTP proxy to capture requests
+      const proxy = await startProxy(config.port);
+
+      return {
+        async stop() {
+          const requests = proxy.getRequests();
+          await proxy.stop();
+
+          return {
+            driver: "api",
+            driverConfig: config,
+            steps: requests.map(toStep),
+          };
+        },
+        // ...
+      };
+    },
+  },
+
+  runner: {
+    async execute(session, ctx) {
+      for (const step of session.steps) {
+        if (step.type === "api.request" && step.injectable) {
+          // Inject payloads into request body/params
+          for (const payload of ctx.payloads) {
+            const response = await fetch(step.url, {
+              body: injectPayload(step.body, payload),
+            });
+
+            // Check for SQL errors, etc.
+            if (detectVulnerability(response)) {
+              ctx.addFinding({
+                /* ... */
+              });
+            }
+          }
+        }
+      }
+    },
+  },
+};
+```
+
+<Card
+  title="Browser Driver Source"
+  icon="github"
+  href="https://github.com/vulcnize/vulcn/tree/main/drivers/browser"
+>
+  See the browser driver implementation for a complete example
+</Card>

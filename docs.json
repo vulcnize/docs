@@ -35,6 +35,19 @@
         ]
       },
       {
+        "tab": "Drivers",
+        "groups": [
+          {
+            "group": "Driver System",
+            "pages": ["drivers/overview", "drivers/creating-drivers"]
+          },
+          {
+            "group": "Official Drivers",
+            "pages": ["drivers/browser"]
+          }
+        ]
+      },
+      {
         "tab": "Plugins",
         "groups": [
           {
@@ -62,8 +75,7 @@
             "group": "Engine API",
             "pages": [
               "api/overview",
-              "api/recorder",
-              "api/runner",
+              "api/driver-manager",
               "api/plugin-manager"
             ]
           },

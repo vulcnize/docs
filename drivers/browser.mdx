@@ -1,0 +1,255 @@
+---
+title: "Browser Driver"
+description: "Record and replay web application interactions using Playwright"
+---
+
+## Overview
+
+The browser driver (`@vulcn/driver-browser`) enables security testing of web applications by recording and replaying browser interactions. It uses [Playwright](https://playwright.dev) for browser automation.
+
+## Installation
+
+```bash
+npm install @vulcn/driver-browser
+```
+
+<Note>
+  The browser driver is included with the `vulcn` CLI by default. You only need
+  to install it separately for programmatic usage.
+</Note>
+
+## Configuration
+
+| Option     | Type                                  | Default                        | Description                              |
+| ---------- | ------------------------------------- | ------------------------------ | ---------------------------------------- |
+| `startUrl` | `string`                              | required                       | URL to navigate to when recording starts |
+| `browser`  | `"chromium" \| "firefox" \| "webkit"` | `"chromium"`                   | Browser engine to use                    |
+| `viewport` | `{ width: number, height: number }`   | `{ width: 1280, height: 720 }` | Browser viewport size                    |
+| `headless` | `boolean`                             | `false`                        | Run browser in headless mode             |
+
+### Example Configuration
+
+```yaml
+# vulcn.config.yml
+settings:
+  driver: browser
+  driverConfig:
+    browser: chromium
+    viewport:
+      width: 1920
+      height: 1080
+```
+
+## Step Types
+
+The browser driver defines the following step types:
+
+### `browser.navigate`
+
+Navigate to a URL.
+
+```yaml
+- id: step_001
+  type: browser.navigate
+  url: https://example.com/login
+  timestamp: 0
+```
+
+### `browser.click`
+
+Click on an element.
+
+```yaml
+- id: step_002
+  type: browser.click
+  selector: button[type="submit"]
+  position:
+    x: 150
+    y: 300
+  timestamp: 1000
+```
+
+### `browser.input`
+
+Type into a form field. This is the primary injection point for payloads.
+
+```yaml
+- id: step_003
+  type: browser.input
+  selector: input[name="username"]
+  value: testuser
+  injectable: true # Mark as payload injection point
+  timestamp: 1500
+```
+
+<Info>
+  Set `injectable: true` on input steps to mark them as payload injection
+  points. During replay, Vulcn will inject security payloads into these fields.
+</Info>
+
+### `browser.keypress`
+
+Press a key or key combination.
+
+```yaml
+- id: step_004
+  type: browser.keypress
+  key: Enter
+  modifiers:
+    - ctrl
+  timestamp: 2000
+```
+
+### `browser.scroll`
+
+Scroll the page or an element.
+
+```yaml
+- id: step_005
+  type: browser.scroll
+  selector: .scrollable-container # Optional, defaults to window
+  position:
+    x: 0
+    y: 500
+  timestamp: 2500
+```
+
+### `browser.wait`
+
+Wait for a duration (useful for manual session editing).
+
+```yaml
+- id: step_006
+  type: browser.wait
+  duration: 1000 # milliseconds
+  timestamp: 3000
+```
+
+## Browser Support
+
+The driver uses a smart fallback strategy:
+
+1. **System Chrome** - Uses your installed Chrome browser (zero download)
+2. **System Edge** - Falls back to Microsoft Edge if Chrome isn't found
+3. **Playwright Browsers** - Uses Playwright's bundled browsers as last resort
+
+Check available browsers:
+
+```bash
+vulcn doctor
+```
+
+Install Playwright browsers if needed:
+
+```bash
+vulcn install chromium
+vulcn install --all
+```
+
+## Programmatic Usage
+
+### Recording
+
+```typescript
+import browserDriver from "@vulcn/driver-browser";
+
+// Start recording
+const handle = await browserDriver.recorder.start(
+  {
+    startUrl: "https://example.com",
+    browser: "chromium",
+    headless: false,
+  },
+  {},
+);
+
+// Wait for user interaction...
+
+// Stop and get session
+const session = await handle.stop();
+console.log(session.steps);
+```
+
+### Running
+
+```typescript
+import { driverManager, pluginManager } from "@vulcn/engine";
+import browserDriver from "@vulcn/driver-browser";
+import payloadsPlugin from "@vulcn/plugin-payloads";
+
+// Register driver and plugins
+driverManager.register(browserDriver);
+pluginManager.addPlugin(payloadsPlugin);
+await pluginManager.initialize();
+
+// Execute session
+const result = await driverManager.execute(session, pluginManager, {
+  headless: true,
+  onFinding: (finding) => console.log("Found:", finding.title),
+});
+
+console.log(`Found ${result.findings.length} vulnerabilities`);
+```
+
+## Detection
+
+During replay, the browser driver monitors for:
+
+- **JavaScript Dialogs** - `alert()`, `confirm()`, `prompt()` triggered by payloads
+- **Console Messages** - `console.log()` outputs matching payload markers
+- **Payload Reflection** - Payload strings appearing in page content
+
+These detections are enhanced when combined with detection plugins:
+
+```yaml
+plugins:
+  - name: "@vulcn/plugin-detect-xss"
+  - name: "@vulcn/plugin-detect-reflection"
+```
+
+## Example Session
+
+Complete recorded session example:
+
+```yaml
+name: Login Form Test
+driver: browser
+driverConfig:
+  browser: chromium
+  startUrl: https://vulnerable-app.example.com/login
+  viewport:
+    width: 1280
+    height: 720
+steps:
+  - id: step_001
+    type: browser.navigate
+    url: https://vulnerable-app.example.com/login
+    timestamp: 0
+
+  - id: step_002
+    type: browser.input
+    selector: "#username"
+    value: admin
+    injectable: true
+    timestamp: 1200
+
+  - id: step_003
+    type: browser.input
+    selector: "#password"
+    value: password123
+    injectable: true
+    timestamp: 2400
+
+  - id: step_004
+    type: browser.click
+    selector: button[type="submit"]
+    timestamp: 3000
+
+metadata:
+  recordedAt: "2026-02-06T12:00:00Z"
+  version: "1"
+```
+
+<Card title="Plugin System" icon="plug" href="/plugins/overview">
+  Learn how to add detection plugins for comprehensive vulnerability scanning
+</Card>

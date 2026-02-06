@@ -1,0 +1,343 @@
+---
+title: "DriverManager"
+description: "API reference for the DriverManager class"
+---
+
+## Overview
+
+The `DriverManager` class handles driver loading, registration, and lifecycle. It's the central point for managing recording and running drivers in Vulcn.
+
+## Import
+
+```typescript
+import { DriverManager, driverManager } from "@vulcn/engine";
+```
+
+<Note>
+  `driverManager` is a default shared instance. Create your own `new
+  DriverManager()` for isolated testing.
+</Note>
+
+## Constructor
+
+```typescript
+const manager = new DriverManager();
+```
+
+Creates a new DriverManager with no drivers registered.
+
+## Methods
+
+### register
+
+Register a driver with the manager.
+
+```typescript
+register(driver: VulcnDriver, source?: DriverSource): void
+```
+
+**Parameters:**
+
+- `driver` - The driver to register
+- `source` - Optional source type (`"npm"`, `"local"`, `"builtin"`)
+
+**Example:**
+
+```typescript
+import browserDriver from "@vulcn/driver-browser";
+
+manager.register(browserDriver);
+```
+
+<Info>
+  The first registered driver automatically becomes the default driver.
+</Info>
+
+### load
+
+Load a driver from npm or a local file path.
+
+```typescript
+async load(nameOrPath: string): Promise<void>
+```
+
+**Parameters:**
+
+- `nameOrPath` - npm package name or file path
+
+**Example:**
+
+```typescript
+// Load from npm
+await manager.load("@vulcn/driver-browser");
+
+// Load from local file
+await manager.load("./my-custom-driver.js");
+```
+
+### get
+
+Get a loaded driver by name.
+
+```typescript
+get(name: string): VulcnDriver | undefined
+```
+
+**Example:**
+
+```typescript
+const driver = manager.get("browser");
+if (driver) {
+  console.log(driver.version);
+}
+```
+
+### getDefault
+
+Get the current default driver.
+
+```typescript
+getDefault(): VulcnDriver | undefined
+```
+
+### setDefault
+
+Set the default driver by name.
+
+```typescript
+setDefault(name: string): void
+```
+
+**Throws:** Error if driver is not registered.
+
+### has
+
+Check if a driver is registered.
+
+```typescript
+has(name: string): boolean
+```
+
+### list
+
+Get all registered drivers.
+
+```typescript
+list(): LoadedDriver[]
+```
+
+**Returns:** Array of loaded driver info including source metadata.
+
+### getForSession
+
+Get the appropriate driver for a session.
+
+```typescript
+getForSession(session: Session): VulcnDriver
+```
+
+**Throws:** Error if the session's driver is not registered.
+
+**Example:**
+
+```typescript
+const session = parseSession(yaml);
+const driver = manager.getForSession(session);
+console.log(`Using ${driver.name} driver`);
+```
+
+### startRecording
+
+Start recording with a specific driver.
+
+```typescript
+async startRecording(
+  driverName: string,
+  config: Record<string, unknown>,
+  options?: RecordOptions
+): Promise<RecordingHandle>
+```
+
+**Parameters:**
+
+- `driverName` - Name of the driver to use
+- `config` - Driver-specific configuration
+- `options` - Optional recording options
+
+**Returns:** A `RecordingHandle` for controlling the recording.
+
+**Example:**
+
+```typescript
+const handle = await manager.startRecording("browser", {
+  startUrl: "https://example.com",
+  browser: "chromium",
+});
+
+// Wait for user interaction...
+
+const session = await handle.stop();
+```
+
+### execute
+
+Execute a session with payloads.
+
+```typescript
+async execute(
+  session: Session,
+  pluginManager: PluginManager,
+  options?: RunOptions
+): Promise<RunResult>
+```
+
+**Parameters:**
+
+- `session` - The session to execute
+- `pluginManager` - Plugin manager with payloads loaded
+- `options` - Run options (headless, callbacks, etc.)
+
+**Returns:** `RunResult` with findings and statistics.
+
+**Example:**
+
+```typescript
+const result = await manager.execute(session, pluginManager, {
+  headless: true,
+  onFinding: (finding) => console.log("Found:", finding.title),
+});
+
+console.log(`Found ${result.findings.length} vulnerabilities`);
+```
+
+## Types
+
+### VulcnDriver
+
+```typescript
+interface VulcnDriver {
+  name: string;
+  version: string;
+  apiVersion?: number;
+  description?: string;
+  configSchema?: z.ZodSchema;
+  stepTypes: string[];
+  recorder: RecorderDriver;
+  runner: RunnerDriver;
+}
+```
+
+### LoadedDriver
+
+```typescript
+interface LoadedDriver {
+  driver: VulcnDriver;
+  source: DriverSource;
+}
+
+type DriverSource = "npm" | "local" | "builtin";
+```
+
+### RecordingHandle
+
+```typescript
+interface RecordingHandle {
+  stop(): Promise<Session>;
+  abort(): Promise<void>;
+  getSteps(): Step[];
+  addStep(step: Omit<Step, "id" | "timestamp">): void;
+}
+```
+
+### Session
+
+```typescript
+interface Session {
+  name: string;
+  driver: string;
+  driverConfig: Record<string, unknown>;
+  steps: Step[];
+  metadata?: {
+    recordedAt?: string;
+    version?: string;
+    [key: string]: unknown;
+  };
+}
+```
+
+### Step
+
+```typescript
+interface Step {
+  id: string;
+  type: string;
+  timestamp: number;
+  [key: string]: unknown;
+}
+```
+
+### RunResult
+
+```typescript
+interface RunResult {
+  findings: Finding[];
+  stepsExecuted: number;
+  payloadsTested: number;
+  duration: number;
+  errors: string[];
+}
+```
+
+## Complete Example
+
+```typescript
+import { DriverManager, PluginManager } from "@vulcn/engine";
+import browserDriver from "@vulcn/driver-browser";
+import payloadsPlugin from "@vulcn/plugin-payloads";
+import xssPlugin from "@vulcn/plugin-detect-xss";
+
+async function runSecurityTest() {
+  // Set up driver manager
+  const driverManager = new DriverManager();
+  driverManager.register(browserDriver);
+
+  // Set up plugin manager
+  const pluginManager = new PluginManager();
+  pluginManager.addPlugin(payloadsPlugin, { builtin: true });
+  pluginManager.addPlugin(xssPlugin);
+  await pluginManager.initialize();
+
+  // Record a session
+  const handle = await driverManager.startRecording("browser", {
+    startUrl: "https://vulnerable-app.example.com",
+    browser: "chromium",
+    headless: false,
+  });
+
+  console.log("Recording... press Ctrl+C when done");
+
+  // In real usage, you'd wait for user interaction
+  // For this example, we'll stop immediately
+  const session = await handle.stop();
+
+  // Execute with payloads
+  const result = await driverManager.execute(session, pluginManager, {
+    headless: true,
+    onFinding: (finding) => {
+      console.log(`🚨 ${finding.severity}: ${finding.title}`);
+    },
+  });
+
+  console.log(`\nResults:`);
+  console.log(`  Steps: ${result.stepsExecuted}`);
+  console.log(`  Payloads: ${result.payloadsTested}`);
+  console.log(`  Findings: ${result.findings.length}`);
+  console.log(`  Duration: ${result.duration}ms`);
+}
+
+runSecurityTest().catch(console.error);
+```
+
+<Card title="Creating Drivers" icon="hammer" href="/drivers/creating-drivers">
+  Learn how to build custom drivers
+</Card>

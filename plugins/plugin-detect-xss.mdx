@@ -1,0 +1,190 @@
+---
+title: "@vulcn/plugin-detect-xss"
+description: "Execution-based XSS detection plugin"
+---
+
+## Overview
+
+This plugin detects XSS vulnerabilities by monitoring **actual JavaScript execution**, not just pattern matching. When `alert()` fires or a console marker appears, you know the XSS is real.
+
+## Why Execution-Based Detection?
+
+Traditional scanners check if payloads appear in the response HTML. This leads to:
+
+- **False positives** - Payload appears but doesn't execute
+- **Missed vulnerabilities** - Payload is transformed but still executes
+
+Vulcn monitors the browser for **actual execution**:
+
+- `alert()`, `confirm()`, `prompt()` dialogs
+- Console markers (`console.log('VULCN_XSS:...')`)
+- DOM mutations (optional)
+
+## Installation
+
+```bash
+npm install @vulcn/plugin-detect-xss
+```
+
+The plugin is auto-loaded by the CLI if not configured.
+
+## Configuration
+
+```yaml
+plugins:
+  - name: "@vulcn/plugin-detect-xss"
+    config:
+      detectDialogs: true
+      detectConsole: true
+      consoleMarker: "VULCN_XSS:"
+      detectDomMutation: false
+      alertPatterns:
+        - "XSS"
+        - "1"
+        - "document.domain"
+      severity: high
+```
+
+## Options
+
+| Option              | Type     | Default        | Description                  |
+| ------------------- | -------- | -------------- | ---------------------------- |
+| `detectDialogs`     | boolean  | `true`         | Monitor alert/confirm/prompt |
+| `detectConsole`     | boolean  | `true`         | Detect console markers       |
+| `consoleMarker`     | string   | `"VULCN_XSS:"` | Console marker prefix        |
+| `detectDomMutation` | boolean  | `false`        | Check for injected scripts   |
+| `alertPatterns`     | string[] | See below      | Patterns to match in alerts  |
+| `severity`          | string   | `"high"`       | Finding severity level       |
+
+### Default Alert Patterns
+
+```yaml
+alertPatterns:
+  - "XSS"
+  - "1"
+  - "document.domain"
+  - "document.cookie"
+  - "vulcn"
+  - "pwned"
+```
+
+## Detection Methods
+
+### Dialog Detection
+
+Monitors `alert()`, `confirm()`, and `prompt()` dialogs:
+
+```javascript
+// These trigger detection:
+alert("XSS");
+confirm("XSS");
+prompt("XSS");
+```
+
+**Finding example:**
+
+```json
+{
+  "type": "xss",
+  "severity": "high",
+  "title": "XSS Confirmed: alert() executed",
+  "description": "JavaScript alert() dialog was triggered...",
+  "metadata": {
+    "detectionMethod": "dialog",
+    "dialogType": "alert",
+    "dialogMessage": "XSS"
+  }
+}
+```
+
+### Console Marker Detection
+
+Detects specially-marked console logs:
+
+```javascript
+// This triggers detection:
+console.log("VULCN_XSS:payload_id");
+```
+
+Useful for payloads that can't trigger dialogs (e.g., Content Security Policy blocks `alert()`).
+
+**Finding example:**
+
+```json
+{
+  "type": "xss",
+  "severity": "high",
+  "title": "XSS Confirmed: Console marker detected",
+  "metadata": {
+    "detectionMethod": "console",
+    "marker": "VULCN_XSS:test123"
+  }
+}
+```
+
+### DOM Mutation Detection (Experimental)
+
+Checks for dynamically created `<script>` elements:
+
+```yaml
+detectDomMutation: true
+```
+
+<Warning>
+  DOM mutation detection has a higher false positive rate. Use with caution.
+</Warning>
+
+## Example Findings
+
+### Confirmed XSS
+
+```bash
+🚨 FINDING: XSS Confirmed: alert() executed
+
+[HIGH] XSS Confirmed: alert() executed
+  Type: xss
+  Step: step_002
+  URL: https://example.com/search?q=test
+  Payload: <script>alert('XSS')</script>
+  Evidence: Dialog type: alert, Message: XSS
+```
+
+## Usage with Other Plugins
+
+Combine with reflection detection for comprehensive coverage:
+
+```yaml
+plugins:
+  - name: "@vulcn/plugin-payloads"
+    config:
+      builtin: true
+
+  - name: "@vulcn/plugin-detect-xss"
+    config:
+      detectDialogs: true
+      severity: high
+
+  - name: "@vulcn/plugin-detect-reflection"
+    config:
+      detectScript: true
+      scriptSeverity: medium
+```
+
+This gives you:
+
+- **High confidence findings** from detect-xss (JavaScript executed)
+- **Lower confidence findings** from detect-reflection (payload appeared in HTML)
+
+## CSP Bypass Payloads
+
+For applications with Content Security Policy that blocks inline scripts, use console-based detection payloads:
+
+```javascript
+// Instead of:
+<script>alert('XSS')</script>
+
+// Use:
+<img src=x onerror="console.log('VULCN_XSS:img_onerror')">
+```
+
+Many CSP policies block `alert()` but allow `console.log()`.

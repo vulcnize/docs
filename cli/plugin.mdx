@@ -1,0 +1,148 @@
+---
+title: "vulcn plugin"
+description: "Manage plugins in your configuration"
+---
+
+## Usage
+
+```bash
+vulcn plugin <command> [options]
+```
+
+## Commands
+
+| Command          | Description                          |
+| ---------------- | ------------------------------------ |
+| `list`           | List configured plugins              |
+| `add <name>`     | Add a plugin to configuration        |
+| `remove <name>`  | Remove a plugin from configuration   |
+| `enable <name>`  | Enable a disabled plugin             |
+| `disable <name>` | Disable a plugin without removing it |
+
+## vulcn plugin list
+
+List all plugins configured in `vulcn.config.yml`:
+
+```bash
+vulcn plugin list
+```
+
+Output:
+
+```bash
+📦 Configured Plugins
+
+  ✓ @vulcn/plugin-payloads
+      builtin: true
+  ✓ @vulcn/plugin-detect-xss
+      detectDialogs: true
+      detectConsole: true
+      severity: "high"
+  (disabled) @vulcn/plugin-detect-reflection
+      enabled: false
+```
+
+## vulcn plugin add
+
+Add a plugin to your configuration:
+
+```bash
+vulcn plugin add <name> [options]
+```
+
+### Options
+
+| Option                | Description                  |
+| --------------------- | ---------------------------- |
+| `-c, --config <json>` | Plugin configuration as JSON |
+
+### Examples
+
+```bash
+# Add a plugin with default config
+vulcn plugin add @vulcn/plugin-detect-reflection
+
+# Add with custom config
+vulcn plugin add @vulcn/plugin-detect-sqli --config '{"severity":"critical"}'
+```
+
+## vulcn plugin remove
+
+Remove a plugin from your configuration:
+
+```bash
+vulcn plugin remove <name>
+```
+
+Example:
+
+```bash
+vulcn plugin remove @vulcn/plugin-detect-reflection
+```
+
+## vulcn plugin enable
+
+Re-enable a disabled plugin:
+
+```bash
+vulcn plugin enable <name>
+```
+
+Example:
+
+```bash
+vulcn plugin enable @vulcn/plugin-detect-xss
+```
+
+## vulcn plugin disable
+
+Disable a plugin without removing it:
+
+```bash
+vulcn plugin disable <name>
+```
+
+Example:
+
+```bash
+vulcn plugin disable @vulcn/plugin-detect-xss
+```
+
+<Tip>
+  Disabling is useful when you want to temporarily turn off a plugin without
+  losing its configuration.
+</Tip>
+
+## Configuration File
+
+The `vulcn plugin` commands modify your `vulcn.config.yml` file:
+
+```yaml
+# vulcn.config.yml
+version: "1"
+plugins:
+  - name: "@vulcn/plugin-payloads"
+    config:
+      builtin: true
+
+  - name: "@vulcn/plugin-detect-xss"
+    config:
+      detectDialogs: true
+      detectConsole: true
+      severity: high
+
+  - name: "@vulcn/plugin-detect-reflection"
+    enabled: false # Disabled plugin
+```
+
+## Official Plugins
+
+| Plugin                            | Description                                          |
+| --------------------------------- | ---------------------------------------------------- |
+| `@vulcn/plugin-payloads`          | Payload loading (built-in, PayloadBox, custom files) |
+| `@vulcn/plugin-detect-xss`        | Execution-based XSS detection (dialogs, console)     |
+| `@vulcn/plugin-detect-reflection` | Pattern-based reflection detection                   |
+
+<Card title="Learn more about plugins" icon="plug" href="/plugins/overview">
+  See the complete plugin documentation
+</Card>

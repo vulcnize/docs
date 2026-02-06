@@ -1,0 +1,338 @@
+---
+title: "Plugin API Reference"
+description: "Complete TypeScript API reference for Vulcn plugins"
+---
+
+## VulcnPlugin
+
+The main plugin interface:
+
+```typescript
+interface VulcnPlugin {
+  /** Unique plugin name (e.g., "@vulcn/plugin-detect-xss") */
+  name: string;
+
+  /** Semantic version */
+  version: string;
+
+  /** Plugin API version (default: 1) */
+  apiVersion?: number;
+
+  /** Human-readable description */
+  description?: string;
+
+  /** Zod schema for configuration validation */
+  configSchema?: z.ZodSchema;
+
+  /** Lifecycle hooks */
+  hooks?: PluginHooks;
+
+  /** Static or async payloads */
+  payloads?: RuntimePayload[] | (() => Promise<RuntimePayload[]>);
+}
+```
+
+## PluginHooks
+
+```typescript
+interface PluginHooks {
+  // Initialization
+  onInit?: (ctx: PluginContext) => Promise<void>;
+  onDestroy?: (ctx: PluginContext) => Promise<void>;
+
+  // Recording
+  onRecordStart?: (ctx: RecordContext) => Promise<void>;
+  onRecordStep?: (step: Step, ctx: RecordContext) => Promise<Step | null>;
+  onRecordEnd?: (session: Session, ctx: RecordContext) => Promise<Session>;
+
+  // Running
+  onRunStart?: (ctx: RunContext) => Promise<void>;
+  onBeforePayload?: (
+    payload: string,
+    step: Step,
+    ctx: RunContext,
+  ) => Promise<string>;
+  onAfterPayload?: (ctx: DetectContext) => Promise<Finding[]>;
+  onRunEnd?: (result: RunResult, ctx: RunContext) => Promise<RunResult>;
+
+  // Browser events
+  onDialog?: (dialog: Dialog, ctx: DetectContext) => Promise<Finding | null>;
+  onConsoleMessage?: (
+    msg: ConsoleMessage,
+    ctx: DetectContext,
+  ) => Promise<Finding | null>;
+  onPageLoad?: (page: Page, ctx: DetectContext) => Promise<Finding[]>;
+  onNetworkRequest?: (
+    req: Request,
+    ctx: DetectContext,
+  ) => Promise<Finding | null>;
+  onNetworkResponse?: (
+    res: Response,
+    ctx: DetectContext,
+  ) => Promise<Finding | null>;
+}
+```
+
+## Context Types
+
+### PluginContext
+
+Base context for all hooks:
+
+```typescript
+interface PluginContext {
+  /** Plugin-specific configuration */
+  config: Record<string, unknown>;
+
+  /** Engine information */
+  engine: EngineInfo;
+
+  /** Shared payload registry */
+  payloads: RuntimePayload[];
+
+  /** Shared findings collection */
+  findings: Finding[];
+
+  /** Scoped logger */
+  logger: PluginLogger;
+
+  /** Fetch API */
+  fetch: typeof fetch;
+}
+
+interface EngineInfo {
+  version: string;
+  pluginApiVersion: number;
+}
+
+interface PluginLogger {
+  debug(msg: string, ...args: unknown[]): void;
+  info(msg: string, ...args: unknown[]): void;
+  warn(msg: string, ...args: unknown[]): void;
+  error(msg: string, ...args: unknown[]): void;
+}
+```
+
+### RecordContext
+
+Context for recording hooks:
+
+```typescript
+interface RecordContext extends PluginContext {
+  /** Starting URL */
+  startUrl: string;
+
+  /** Browser type */
+  browser: BrowserType;
+
+  /** Playwright page object */
+  page: Page;
+}
+```
+
+### RunContext
+
+Context for running hooks:
+
+```typescript
+interface RunContext extends PluginContext {
+  /** Session being executed */
+  session: Session;
+
+  /** Playwright page object */
+  page: Page;
+
+  /** Browser type */
+  browser: BrowserType;
+
+  /** Running headless */
+  headless: boolean;
+}
+```
+
+### DetectContext
+
+Context for detection hooks:
+
+```typescript
+interface DetectContext extends RunContext {
+  /** Current step being tested */
+  step: Step;
+
+  /** Payload set being used */
+  payloadSet: RuntimePayload;
+
+  /** Actual payload value */
+  payloadValue: string;
+
+  /** Step identifier */
+  stepId: string;
+}
+```
+
+## Data Types
+
+### Finding
+
+```typescript
+interface Finding {
+  /** Vulnerability type */
+  type: PayloadCategory;
+
+  /** Severity level */
+  severity: "critical" | "high" | "medium" | "low" | "info";
+
+  /** Finding title */
+  title: string;
+
+  /** Detailed description */
+  description: string;
+
+  /** Step that triggered the finding */
+  stepId: string;
+
+  /** Payload that caused the finding */
+  payload: string;
+
+  /** URL where finding occurred */
+  url: string;
+
+  /** Evidence (optional) */
+  evidence?: string;
+
+  /** Plugin-specific metadata */
+  metadata?: Record<string, unknown>;
+}
+```
+
+### RuntimePayload
+
+```typescript
+interface RuntimePayload {
+  /** Unique name */
+  name: string;
+
+  /** Vulnerability category */
+  category: PayloadCategory;
+
+  /** Description */
+  description: string;
+
+  /** Payload strings */
+  payloads: string[];
+
+  /** Detection patterns */
+  detectPatterns: RegExp[];
+
+  /** Source */
+  source: "builtin" | "custom" | "payloadbox" | "plugin";
+}
+
+type PayloadCategory =
+  | "xss"
+  | "sqli"
+  | "ssrf"
+  | "xxe"
+  | "command-injection"
+  | "path-traversal"
+  | "open-redirect"
+  | "reflection"
+  | "custom";
+```
+
+### Session
+
+```typescript
+interface Session {
+  name: string;
+  startUrl: string;
+  browser: BrowserType;
+  steps: Step[];
+}
+
+interface Step {
+  id: string;
+  type: "navigate" | "click" | "fill" | "select" | "check";
+  timestamp: number;
+  url?: string;
+  selector?: string;
+  value?: string;
+}
+```
+
+### RunResult
+
+```typescript
+interface RunResult {
+  findings: Finding[];
+  stepsExecuted: number;
+  payloadsTested: number;
+  duration: number;
+  errors: string[];
+}
+```
+
+## PluginManager
+
+```typescript
+class PluginManager {
+  /** Load config from file */
+  loadConfig(path?: string): Promise<VulcnConfig>;
+
+  /** Load plugins declared in config */
+  loadPlugins(): Promise<void>;
+
+  /** Add plugin programmatically */
+  addPlugin(plugin: VulcnPlugin, config?: Record<string, unknown>): void;
+
+  /** Check if plugin is loaded */
+  hasPlugin(name: string): boolean;
+
+  /** Initialize all plugins */
+  initialize(): Promise<void>;
+
+  /** Destroy all plugins */
+  destroy(): Promise<void>;
+
+  /** Get loaded payloads */
+  getPayloads(): RuntimePayload[];
+
+  /** Get collected findings */
+  getFindings(): Finding[];
+
+  /** Add payloads */
+  addPayloads(payloads: RuntimePayload[]): void;
+
+  /** Add finding */
+  addFinding(finding: Finding): void;
+}
+```
+
+## Usage Example
+
+```typescript
+import { PluginManager, Runner, parseSession } from "@vulcn/engine";
+import myPlugin from "./my-plugin";
+
+// Create manager
+const manager = new PluginManager();
+
+// Add plugins
+manager.addPlugin(myPlugin, { threshold: 75 });
+
+// Initialize
+await manager.initialize();
+
+// Run tests
+const session = parseSession(yaml);
+const result = await Runner.execute(
+  session,
+  {
+    headless: true,
+  },
+  { pluginManager: manager },
+);
+
+// Cleanup
+await manager.destroy();
+```

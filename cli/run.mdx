@@ -1,0 +1,157 @@
+---
+title: "vulcn run"
+description: "Run security tests on a recorded session"
+---
+
+## Usage
+
+```bash
+vulcn run <session> [options]
+```
+
+## Arguments
+
+| Argument  | Description                      | Required |
+| --------- | -------------------------------- | -------- |
+| `session` | Session file to run (.vulcn.yml) | Yes      |
+
+## Options
+
+| Option                      | Description                                   | Default     |
+| --------------------------- | --------------------------------------------- | ----------- |
+| `-p, --payload <names...>`  | Payloads to use (e.g., xss-basic, sqli-basic) | `xss-basic` |
+| `-f, --payload-file <file>` | Load custom payloads from YAML/JSON file      | -           |
+| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)    | `chromium`  |
+| `--headless`                | Run in headless mode                          | `true`      |
+| `--no-headless`             | Run with visible browser                      | -           |
+
+## Description
+
+The `run` command replays a recorded session while injecting security payloads into every input field. It uses the configured detection plugins to identify vulnerabilities.
+
+## Examples
+
+### Default Run
+
+```bash
+vulcn run session.vulcn.yml
+```
+
+Runs with `xss-basic` payloads and the default `@vulcn/plugin-detect-xss` detection.
+
+### Multiple Payload Sets
+
+```bash
+vulcn run session.vulcn.yml --payload xss-basic sqli-basic ssrf-basic
+```
+
+### Use PayloadsAllTheThings
+
+```bash
+vulcn run session.vulcn.yml --payload payloadbox:xss payloadbox:sql-injection
+```
+
+### Custom Payload File
+
+```bash
+vulcn run session.vulcn.yml --payload-file ./my-payloads.yml
+```
+
+Custom payload file format:
+
+```yaml
+# my-payloads.yml
+version: "1"
+payloads:
+  - name: custom-xss
+    category: xss
+    description: My custom XSS payloads
+    payloads:
+      - "<script>alert('custom')</script>"
+      - "<img src=x onerror=alert('custom')>"
+```
+
+### Visible Browser
+
+```bash
+vulcn run session.vulcn.yml --no-headless
+```
+
+Watch the browser as tests run. Useful for debugging.
+
+### Different Browser
+
+```bash
+vulcn run session.vulcn.yml --browser firefox
+```
+
+## Output
+
+### Findings
+
+When vulnerabilities are detected:
+
+```bash
+🔍 Running security tests
+   Session: Login Flow Test
+   Payloads: xss-basic, sqli-basic
+   Payload count: 25
+   Browser: chromium
+   Headless: true
+
+⚠️  FINDING: XSS Confirmed: alert() executed
+   Step: step_003
+   Payload: <script>alert('XSS')</script>...
+   URL: https://example.com/search
+
+📊 Results
+   Steps executed: 5
+   Payloads tested: 125
+   Duration: 45.2s
+
+🚨 1 findings detected!
+
+[HIGH] XSS Confirmed: alert() executed
+  Type: xss
+  Step: step_003
+  URL: https://example.com/search
+  Payload: <script>alert('XSS')</script>
+```
+
+### No Findings
+
+```bash
+📊 Results
+   Steps executed: 5
+   Payloads tested: 125
+   Duration: 45.2s
+
+✅ No vulnerabilities detected
+```
+
+## Exit Codes
+
+| Code | Description                             |
+| ---- | --------------------------------------- |
+| `0`  | No vulnerabilities found                |
+| `1`  | Vulnerabilities found or error occurred |
+
+<Tip>
+  Use the exit code in CI/CD pipelines to fail builds when vulnerabilities are
+  detected: ```bash vulcn run session.vulcn.yml || exit 1 ```
+</Tip>
+
+## Detection Plugins
+
+The `run` command automatically loads the `@vulcn/plugin-detect-xss` plugin if not already configured. This plugin detects XSS by monitoring:
+
+- **`alert()`, `confirm()`, `prompt()`** dialogs
+- **Console markers** (`console.log('VULCN_XSS:...')`)
+
+For more detection capabilities, add additional plugins:
+
+```bash
+vulcn plugin add @vulcn/plugin-detect-reflection
+```
+
+See [Plugins](/plugins/overview) for more information.

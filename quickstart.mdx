@@ -1,80 +1,250 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Find your first vulnerability in under 5 minutes"
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
+<Info>**Requirements:** - Node.js v18 or higher - npm, pnpm, or yarn</Info>
 
-### Step 1: Set up your local environment
+## Installation
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+<Step title="Install the CLI">
 
-### Step 2: Deploy your changes
+<CodeGroup>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+```bash npm
+npm install -g vulcn
+```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+```bash pnpm
+pnpm add -g vulcn
+```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+```bash yarn
+yarn global add vulcn
+```
 
-### Step 3: Go live
+</CodeGroup>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+</Step>
 
-## Next steps
+<Step title="Initialize configuration">
 
-Now that you have your docs running, explore these key features:
+Create a `vulcn.config.yml` file with default plugins:
+
+```bash
+vulcn init
+```
+
+This creates a config file with the official detection plugins pre-configured:
+
+```yaml
+# vulcn.config.yml
+version: "1"
+plugins:
+  - name: "@vulcn/plugin-payloads"
+    config:
+      builtin: true
+  - name: "@vulcn/plugin-detect-xss"
+    config:
+      detectDialogs: true
+      detectConsole: true
+      severity: high
+settings:
+  browser: chromium
+  headless: true
+```
+
+</Step>
+
+<Step title="Install browsers (optional)">
+
+Vulcn uses Playwright for browser automation. Browsers are installed automatically on first use, but you can install them manually:
+
+```bash
+vulcn install
+```
+
+Or install all browsers:
+
+```bash
+vulcn install --all
+```
+
+</Step>
+</Steps>
+
+## Record Your First Session
+
+<Steps>
+<Step title="Start recording">
+
+Open a browser and record your interactions with the target application:
+
+```bash
+vulcn record https://example.com --output session.vulcn.yml
+```
+
+<Tip>
+  The browser opens and records everything you do. Fill out forms, click
+  buttons, navigate pages—Vulcn captures it all.
+</Tip>
+
+</Step>
+
+<Step title="Interact with the app">
+
+In the browser:
+
+1. Navigate to a page with input fields
+2. Fill out a form (login, search, comment, etc.)
+3. Submit the form
+4. Close the browser when done
+
+</Step>
+
+<Step title="Session saved">
+
+Your interactions are saved to `session.vulcn.yml`:
+
+```yaml
+name: Session 2026-02-06
+startUrl: https://example.com
+browser: chromium
+steps:
+  - id: step_001
+    type: navigate
+    url: https://example.com
+    timestamp: 1707192000000
+  - id: step_002
+    type: fill
+    selector: input[name="search"]
+    value: test query
+    timestamp: 1707192005000
+  - id: step_003
+    type: click
+    selector: button[type="submit"]
+    timestamp: 1707192010000
+```
+
+</Step>
+</Steps>
+
+## Run Security Tests
+
+<Steps>
+<Step title="Execute tests">
+
+Run the recorded session with security payloads:
+
+```bash
+vulcn run session.vulcn.yml
+```
+
+By default, Vulcn uses the `xss-basic` payload set and the `@vulcn/plugin-detect-xss` plugin for detection.
+
+</Step>
+
+<Step title="Choose specific payloads">
+
+Test with specific payload sets:
+
+```bash
+vulcn run session.vulcn.yml --payload xss-basic sqli-basic
+```
+
+Or use PayloadsAllTheThings:
+
+```bash
+vulcn run session.vulcn.yml --payload payloadbox:xss
+```
+
+</Step>
+
+<Step title="Review findings">
+
+If vulnerabilities are found, you'll see output like:
+
+```bash
+🔍 Running security tests
+   Session: Session 2026-02-06
+   Payloads: xss-basic
+   Payload count: 15
+   Browser: chromium
+   Headless: true
+
+⚠️  FINDING: XSS Confirmed: alert() executed
+   Step: step_002
+   Payload: <script>alert('XSS')</script>...
+   URL: https://example.com/search
+
+📊 Results
+   Steps executed: 3
+   Payloads tested: 45
+   Duration: 12.3s
+
+🚨 1 findings detected!
+
+[HIGH] XSS Confirmed: alert() executed
+  Type: xss
+  Step: step_002
+  URL: https://example.com/search
+  Payload: <script>alert('XSS')</script>
+```
+
+</Step>
+</Steps>
+
+## Explore Payloads
+
+List all available built-in payloads:
+
+```bash
+vulcn payloads
+```
+
+Output:
+
+```bash
+📦 Available Payloads
+
+XSS
+  xss-basic        Basic XSS payloads (15 payloads)
+  xss-event        Event handler XSS (12 payloads)
+  xss-svg          SVG-based XSS (8 payloads)
+  xss-polyglot     Polyglot XSS payloads (5 payloads)
+
+SQL Injection
+  sqli-basic       Basic SQLi payloads (10 payloads)
+  sqli-error       Error-based SQLi (8 payloads)
+  sqli-blind       Blind SQLi payloads (6 payloads)
+  sqli-union       UNION-based SQLi (5 payloads)
+
+Other
+  ssrf-basic       SSRF payloads (5 payloads)
+  xxe-basic        XXE payloads (4 payloads)
+  cmd-basic        Command injection (6 payloads)
+  path-traversal   Path traversal (8 payloads)
+  open-redirect    Open redirect (4 payloads)
+
+Total: 13 payload sets, 91 payloads
+```
+
+## Next Steps
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Learn all available commands and options
+  </Card>
+  <Card title="Configuration" icon="gear" href="/config/overview">
+    Customize Vulcn with vulcn.config.yml
+  </Card>
+  <Card title="Plugins" icon="plug" href="/plugins/overview">
+    Add more detection capabilities with plugins
+  </Card>
+  <Card title="Custom Payloads" icon="syringe" href="/plugins/plugin-payloads">
+    Load custom payloads from files
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

@@ -1,0 +1,127 @@
+---
+title: "vulcn record"
+description: "Record browser interactions into a session file"
+---
+
+## Usage
+
+```bash
+vulcn record <url> [options]
+```
+
+## Arguments
+
+| Argument | Description                 | Required |
+| -------- | --------------------------- | -------- |
+| `url`    | Starting URL to record from | Yes      |
+
+## Options
+
+| Option                    | Description                                | Default             |
+| ------------------------- | ------------------------------------------ | ------------------- |
+| `-o, --output <file>`     | Output file path                           | `session.vulcn.yml` |
+| `-b, --browser <browser>` | Browser to use (chromium, firefox, webkit) | `chromium`          |
+| `--headless`              | Run in headless mode                       | `false`             |
+
+## Description
+
+The `record` command opens a browser window and captures your interactions with a web application. Every click, form input, and navigation is recorded into a session file that can be replayed with security payloads.
+
+## Examples
+
+### Basic Recording
+
+```bash
+vulcn record https://example.com
+```
+
+This opens Chromium, records your interactions, and saves to `session.vulcn.yml`.
+
+### Custom Output File
+
+```bash
+vulcn record https://example.com --output login-flow.vulcn.yml
+```
+
+### Use Firefox
+
+```bash
+vulcn record https://example.com --browser firefox
+```
+
+### Headless Recording
+
+<Warning>
+  Headless recording is generally not recommended as you can't see what you're
+  recording. It's useful for automated scenarios where you control the page
+  programmatically.
+</Warning>
+
+```bash
+vulcn record https://example.com --headless
+```
+
+## Session File Format
+
+The recorded session is saved as a YAML file:
+
+```yaml
+name: Session 2026-02-06
+startUrl: https://example.com
+browser: chromium
+steps:
+  - id: step_001
+    type: navigate
+    url: https://example.com
+    timestamp: 1707192000000
+
+  - id: step_002
+    type: click
+    selector: "#login-button"
+    timestamp: 1707192005000
+
+  - id: step_003
+    type: fill
+    selector: "input[name='username']"
+    value: testuser
+    timestamp: 1707192010000
+
+  - id: step_004
+    type: fill
+    selector: "input[name='password']"
+    value: "********"
+    timestamp: 1707192015000
+
+  - id: step_005
+    type: click
+    selector: "button[type='submit']"
+    timestamp: 1707192020000
+```
+
+## Step Types
+
+| Type       | Description        | Fields              |
+| ---------- | ------------------ | ------------------- |
+| `navigate` | Page navigation    | `url`               |
+| `click`    | Mouse click        | `selector`          |
+| `fill`     | Text input         | `selector`, `value` |
+| `select`   | Dropdown selection | `selector`, `value` |
+| `check`    | Checkbox toggle    | `selector`          |
+
+## Tips
+
+<Tip>
+  **Focus on input fields**: Record interactions that involve user input—forms,
+  search boxes, comments. These are the injection points Vulcn will test.
+</Tip>
+
+<Tip>
+  **Keep sessions focused**: Record one workflow per session (login, search,
+  checkout). This makes it easier to identify which workflow triggered a
+  vulnerability.
+</Tip>
+
+<Note>
+  Vulcn automatically masks password fields in the session file. The actual
+  values are not stored—only that a password field was filled.
+</Note>

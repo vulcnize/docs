@@ -1,0 +1,163 @@
+---
+title: "API Overview"
+description: "Programmatic API for the Vulcn engine"
+---
+
+## Installation
+
+```bash
+npm install @vulcn/engine
+```
+
+## Core Classes
+
+<CardGroup cols={2}>
+  <Card title="Recorder" icon="circle-dot" href="/api/recorder">
+    Record browser sessions programmatically
+  </Card>
+  <Card title="Runner" icon="play" href="/api/runner">
+    Execute security tests on sessions
+  </Card>
+  <Card title="PluginManager" icon="plug" href="/api/plugin-manager">
+    Load and manage plugins
+  </Card>
+  <Card title="Types" icon="code" href="/api/types">
+    TypeScript type definitions
+  </Card>
+</CardGroup>
+
+## Quick Example
+
+```typescript
+import {
+  Recorder,
+  Runner,
+  PluginManager,
+  parseSession,
+  stringifySession,
+} from "@vulcn/engine";
+import detectXss from "@vulcn/plugin-detect-xss";
+import payloadsPlugin from "@vulcn/plugin-payloads";
+
+// Record a session
+const recording = await Recorder.start("https://example.com", {
+  browser: "chromium",
+  headless: false,
+});
+
+// Wait for user to finish interacting
+// ...
+
+const session = await recording.stop();
+
+// Save session
+const yaml = stringifySession(session);
+await fs.writeFile("session.vulcn.yml", yaml);
+
+// Set up plugins
+const manager = new PluginManager();
+manager.addPlugin(payloadsPlugin, { builtin: true });
+manager.addPlugin(detectXss, { detectDialogs: true });
+await manager.initialize();
+
+// Run security tests
+const result = await Runner.execute(
+  session,
+  {
+    headless: true,
+    onFinding: (finding) => {
+      console.log(`Found: ${finding.title}`);
+    },
+  },
+  { pluginManager: manager },
+);
+
+console.log(`Tested ${result.payloadsTested} payloads`);
+console.log(`Found ${result.findings.length} vulnerabilities`);
+
+// Cleanup
+await manager.destroy();
+```
+
+## Module Exports
+
+```typescript
+// Classes
+export { Recorder } from "./recorder";
+export { Runner } from "./runner";
+export { PluginManager } from "./plugin-manager";
+
+// Session utilities
+export { parseSession, stringifySession } from "./session";
+
+// Types
+export type {
+  Session,
+  Step,
+  Finding,
+  RunResult,
+  BrowserType,
+  RecorderOptions,
+  RunnerOptions,
+  VulcnPlugin,
+  PluginContext,
+  RunContext,
+  DetectContext,
+  RuntimePayload,
+  PayloadCategory,
+} from "./types";
+```
+
+## Browser Support
+
+Vulcn uses [Playwright](https://playwright.dev) for browser automation:
+
+| Browser  | Support         |
+| -------- | --------------- |
+| Chromium | ✅ Full support |
+| Firefox  | ✅ Full support |
+| WebKit   | ✅ Full support |
+
+Install browsers:
+
+```typescript
+import { installBrowsers } from "@vulcn/engine";
+
+// Install Chromium only
+await installBrowsers({ chromium: true });
+
+// Install all
+await installBrowsers({ all: true });
+```
+
+## Error Handling
+
+All async methods may throw:
+
+```typescript
+try {
+  const result = await Runner.execute(session, options);
+} catch (error) {
+  if (error.name === "VulcnRecordingError") {
+    console.error("Recording failed:", error.message);
+  } else if (error.name === "VulcnRunnerError") {
+    console.error("Runner failed:", error.message);
+  } else {
+    throw error;
+  }
+}
+```
+
+## TypeScript Support
+
+Full TypeScript support with exported types:
+
+```typescript
+import type {
+  Session,
+  Step,
+  Finding,
+  VulcnPlugin,
+  RuntimePayload,
+} from "@vulcn/engine";
+```

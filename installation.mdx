@@ -1,0 +1,168 @@
+---
+title: "Installation"
+description: "Install Vulcn and set up your environment"
+---
+
+## System Requirements
+
+<Info>
+  - **Node.js**: v18.0.0 or higher - **Operating System**: macOS, Linux, or
+  Windows - **Package Manager**: npm, pnpm, or yarn
+</Info>
+
+## Install the CLI
+
+<CodeGroup>
+
+```bash npm
+npm install -g vulcn
+```
+
+```bash pnpm
+pnpm add -g vulcn
+```
+
+```bash yarn
+yarn global add vulcn
+```
+
+</CodeGroup>
+
+Verify the installation:
+
+```bash
+vulcn --version
+# Output: 0.2.0
+```
+
+## Install Browsers
+
+Vulcn uses [Playwright](https://playwright.dev) for browser automation. Browsers are installed automatically on first use, but you can install them manually:
+
+```bash
+# Install Chromium (default)
+vulcn install
+
+# Install specific browsers
+vulcn install chromium firefox webkit
+
+# Install all browsers
+vulcn install --all
+```
+
+## Check Your Setup
+
+Run the doctor command to verify your environment:
+
+```bash
+vulcn doctor
+```
+
+Output:
+
+```bash
+🔍 Checking Vulcn environment...
+
+✓ Node.js v20.10.0
+✓ Vulcn CLI v0.2.0
+✓ Chromium installed
+✗ Firefox not installed
+✗ WebKit not installed
+
+Run 'vulcn install --all' to install missing browsers.
+```
+
+## Initialize Configuration
+
+Create a `vulcn.config.yml` file with default settings:
+
+```bash
+vulcn init
+```
+
+This creates a configuration file with the official plugins pre-configured:
+
+```yaml
+# vulcn.config.yml
+version: "1"
+plugins:
+  - name: "@vulcn/plugin-payloads"
+    config:
+      builtin: true
+  - name: "@vulcn/plugin-detect-xss"
+    config:
+      detectDialogs: true
+      detectConsole: true
+      severity: high
+settings:
+  browser: chromium
+  headless: true
+```
+
+<Tip>
+  You can run `vulcn init --force` to overwrite an existing configuration file.
+</Tip>
+
+## Programmatic Usage
+
+For programmatic usage, install the engine package:
+
+<CodeGroup>
+
+```bash npm
+npm install @vulcn/engine
+```
+
+```bash pnpm
+pnpm add @vulcn/engine
+```
+
+```bash yarn
+yarn add @vulcn/engine
+```
+
+</CodeGroup>
+
+Example:
+
+```typescript
+import { Recorder, Runner, parseSession, PluginManager } from "@vulcn/engine";
+
+// Record a session
+const recording = await Recorder.start("https://example.com");
+// ... user interacts ...
+const session = await recording.stop();
+
+// Run with payloads
+const result = await Runner.execute(session, {
+  headless: true,
+  onFinding: (finding) => console.log("Found:", finding.title),
+});
+
+console.log(`Found ${result.findings.length} vulnerabilities`);
+```
+
+## Uninstall
+
+To uninstall Vulcn:
+
+```bash
+npm uninstall -g vulcn
+```
+
+To remove Playwright browsers:
+
+```bash
+rm -rf ~/.cache/ms-playwright  # Linux/macOS
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Record and run your first security test
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Learn all available commands
+  </Card>
+</CardGroup>

@@ -1,0 +1,319 @@
+---
+title: "Types"
+description: "TypeScript type definitions for Vulcn"
+---
+
+## Core Types
+
+### Session
+
+```typescript
+interface Session {
+  /** Session name */
+  name: string;
+
+  /** Starting URL */
+  startUrl: string;
+
+  /** Browser used for recording */
+  browser: BrowserType;
+
+  /** Recorded steps */
+  steps: Step[];
+}
+```
+
+### Step
+
+```typescript
+interface Step {
+  /** Unique step ID */
+  id: string;
+
+  /** Step type */
+  type: StepType;
+
+  /** Timestamp when step was recorded */
+  timestamp: number;
+
+  /** URL for navigate steps */
+  url?: string;
+
+  /** CSS selector for interaction steps */
+  selector?: string;
+
+  /** Value for fill/select steps */
+  value?: string;
+}
+
+type StepType = "navigate" | "click" | "fill" | "select" | "check";
+```
+
+### BrowserType
+
+```typescript
+type BrowserType = "chromium" | "firefox" | "webkit";
+```
+
+## Finding Types
+
+### Finding
+
+```typescript
+interface Finding {
+  /** Vulnerability type */
+  type: PayloadCategory;
+
+  /** Severity level */
+  severity: Severity;
+
+  /** Finding title */
+  title: string;
+
+  /** Detailed description */
+  description: string;
+
+  /** Step that triggered the finding */
+  stepId: string;
+
+  /** Payload that caused the finding */
+  payload: string;
+
+  /** URL where finding occurred */
+  url: string;
+
+  /** Evidence string */
+  evidence?: string;
+
+  /** Plugin-specific metadata */
+  metadata?: Record<string, unknown>;
+}
+
+type Severity = "critical" | "high" | "medium" | "low" | "info";
+```
+
+### RunResult
+
+```typescript
+interface RunResult {
+  /** All findings detected */
+  findings: Finding[];
+
+  /** Number of steps executed */
+  stepsExecuted: number;
+
+  /** Number of payloads tested */
+  payloadsTested: number;
+
+  /** Execution duration in milliseconds */
+  duration: number;
+
+  /** Errors that occurred */
+  errors: string[];
+}
+```
+
+## Payload Types
+
+### RuntimePayload
+
+```typescript
+interface RuntimePayload {
+  /** Unique name */
+  name: string;
+
+  /** Vulnerability category */
+  category: PayloadCategory;
+
+  /** Description */
+  description: string;
+
+  /** Payload strings to inject */
+  payloads: string[];
+
+  /** Detection patterns (regex) */
+  detectPatterns: RegExp[];
+
+  /** Payload source */
+  source: PayloadSource;
+}
+```
+
+### PayloadCategory
+
+```typescript
+type PayloadCategory =
+  | "xss"
+  | "sqli"
+  | "ssrf"
+  | "xxe"
+  | "command-injection"
+  | "path-traversal"
+  | "open-redirect"
+  | "reflection"
+  | "custom";
+```
+
+### PayloadSource
+
+```typescript
+type PayloadSource = "builtin" | "custom" | "payloadbox" | "plugin";
+```
+
+## Plugin Types
+
+### VulcnPlugin
+
+```typescript
+interface VulcnPlugin {
+  /** Unique plugin name */
+  name: string;
+
+  /** Semantic version */
+  version: string;
+
+  /** Plugin API version (default: 1) */
+  apiVersion?: number;
+
+  /** Description */
+  description?: string;
+
+  /** Zod config schema */
+  configSchema?: z.ZodSchema;
+
+  /** Lifecycle hooks */
+  hooks?: PluginHooks;
+
+  /** Payloads provided by plugin */
+  payloads?: RuntimePayload[] | (() => Promise<RuntimePayload[]>);
+}
+```
+
+### PluginHooks
+
+```typescript
+interface PluginHooks {
+  onInit?: (ctx: PluginContext) => Promise<void>;
+  onDestroy?: (ctx: PluginContext) => Promise<void>;
+  onRecordStart?: (ctx: RecordContext) => Promise<void>;
+  onRecordStep?: (step: Step, ctx: RecordContext) => Promise<Step | null>;
+  onRecordEnd?: (session: Session, ctx: RecordContext) => Promise<Session>;
+  onRunStart?: (ctx: RunContext) => Promise<void>;
+  onBeforePayload?: (
+    payload: string,
+    step: Step,
+    ctx: RunContext,
+  ) => Promise<string>;
+  onAfterPayload?: (ctx: DetectContext) => Promise<Finding[]>;
+  onRunEnd?: (result: RunResult, ctx: RunContext) => Promise<RunResult>;
+  onDialog?: (dialog: Dialog, ctx: DetectContext) => Promise<Finding | null>;
+  onConsoleMessage?: (
+    msg: ConsoleMessage,
+    ctx: DetectContext,
+  ) => Promise<Finding | null>;
+  onPageLoad?: (page: Page, ctx: DetectContext) => Promise<Finding[]>;
+}
+```
+
+## Context Types
+
+### PluginContext
+
+```typescript
+interface PluginContext {
+  config: Record<string, unknown>;
+  engine: EngineInfo;
+  payloads: RuntimePayload[];
+  findings: Finding[];
+  logger: PluginLogger;
+  fetch: typeof fetch;
+}
+
+interface EngineInfo {
+  version: string;
+  pluginApiVersion: number;
+}
+
+interface PluginLogger {
+  debug(msg: string, ...args: unknown[]): void;
+  info(msg: string, ...args: unknown[]): void;
+  warn(msg: string, ...args: unknown[]): void;
+  error(msg: string, ...args: unknown[]): void;
+}
+```
+
+### RecordContext
+
+```typescript
+interface RecordContext extends PluginContext {
+  startUrl: string;
+  browser: BrowserType;
+  page: Page;
+}
+```
+
+### RunContext
+
+```typescript
+interface RunContext extends PluginContext {
+  session: Session;
+  page: Page;
+  browser: BrowserType;
+  headless: boolean;
+}
+```
+
+### DetectContext
+
+```typescript
+interface DetectContext extends RunContext {
+  step: Step;
+  payloadSet: RuntimePayload;
+  payloadValue: string;
+  stepId: string;
+}
+```
+
+## Options Types
+
+### RecorderOptions
+
+```typescript
+interface RecorderOptions {
+  browser?: BrowserType;
+  viewport?: { width: number; height: number };
+  headless?: boolean;
+}
+```
+
+### RunnerOptions
+
+```typescript
+interface RunnerOptions {
+  browser?: BrowserType;
+  headless?: boolean;
+  onFinding?: (finding: Finding) => void;
+}
+```
+
+## Configuration Types
+
+### VulcnConfig
+
+```typescript
+interface VulcnConfig {
+  version: string;
+  plugins?: PluginConfig[];
+  settings?: {
+    browser?: BrowserType;
+    headless?: boolean;
+    timeout?: number;
+  };
+}
+
+interface PluginConfig {
+  name: string;
+  config?: Record<string, unknown>;
+  enabled?: boolean;
+}
+```

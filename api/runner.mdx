@@ -1,0 +1,220 @@
+---
+title: "Runner"
+description: "Execute security tests on recorded sessions"
+---
+
+## Overview
+
+The `Runner` class replays recorded sessions while injecting security payloads and monitoring for vulnerabilities.
+
+## Static Methods
+
+### Runner.execute
+
+Execute security tests on a session.
+
+```typescript
+static async execute(
+  session: Session,
+  options: RunnerOptions,
+  context?: { pluginManager?: PluginManager }
+): Promise<RunResult>
+```
+
+**Parameters:**
+
+| Name      | Type          | Description             |
+| --------- | ------------- | ----------------------- |
+| `session` | Session       | Session to execute      |
+| `options` | RunnerOptions | Execution options       |
+| `context` | object        | Optional plugin manager |
+
+**Returns:** `RunResult` with findings
+
+**Example:**
+
+```typescript
+import { Runner, parseSession, PluginManager } from "@vulcn/engine";
+import detectXss from "@vulcn/plugin-detect-xss";
+
+const session = parseSession(yaml);
+
+const manager = new PluginManager();
+manager.addPlugin(detectXss);
+await manager.initialize();
+
+const result = await Runner.execute(
+  session,
+  {
+    headless: true,
+    onFinding: (finding) => {
+      console.log(`Found: ${finding.title}`);
+    },
+  },
+  { pluginManager: manager },
+);
+
+console.log(`Found ${result.findings.length} vulnerabilities`);
+```
+
+## RunnerOptions
+
+```typescript
+interface RunnerOptions {
+  /** Browser to use (default: "chromium") */
+  browser?: "chromium" | "firefox" | "webkit";
+
+  /** Run headless (default: true) */
+  headless?: boolean;
+
+  /** Callback for each finding */
+  onFinding?: (finding: Finding) => void;
+}
+```
+
+## RunResult
+
+```typescript
+interface RunResult {
+  /** All findings detected */
+  findings: Finding[];
+
+  /** Number of steps executed */
+  stepsExecuted: number;
+
+  /** Number of payloads tested */
+  payloadsTested: number;
+
+  /** Execution duration in milliseconds */
+  duration: number;
+
+  /** Any errors that occurred */
+  errors: string[];
+}
+```
+
+## Finding Structure
+
+```typescript
+interface Finding {
+  type: PayloadCategory;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  title: string;
+  description: string;
+  stepId: string;
+  payload: string;
+  url: string;
+  evidence?: string;
+  metadata?: Record<string, unknown>;
+}
+```
+
+## Processing Findings
+
+```typescript
+const result = await Runner.execute(session, options);
+
+// Filter by severity
+const criticalFindings = result.findings.filter(
+  (f) => f.severity === "critical" || f.severity === "high",
+);
+
+// Group by type
+const byType = result.findings.reduce(
+  (acc, f) => {
+    acc[f.type] = acc[f.type] || [];
+    acc[f.type].push(f);
+    return acc;
+  },
+  {} as Record<string, Finding[]>,
+);
+
+// Generate report
+for (const finding of result.findings) {
+  console.log(`[${finding.severity.toUpperCase()}] ${finding.title}`);
+  console.log(`  URL: ${finding.url}`);
+  console.log(`  Payload: ${finding.payload}`);
+  if (finding.evidence) {
+    console.log(`  Evidence: ${finding.evidence}`);
+  }
+}
+```
+
+## Real-time Finding Callbacks
+
+Process findings as they're discovered:
+
+```typescript
+const result = await Runner.execute(session, {
+  headless: true,
+  onFinding: (finding) => {
+    // Log immediately
+    console.log(`🚨 ${finding.title}`);
+
+    // Send to webhook
+    fetch("https://api.example.com/findings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(finding),
+    });
+
+    // Exit on critical
+    if (finding.severity === "critical") {
+      process.exit(1);
+    }
+  },
+});
+```
+
+## Complete Example
+
+```typescript
+import { Runner, PluginManager, parseSession } from "@vulcn/engine";
+import payloadsPlugin from "@vulcn/plugin-payloads";
+import detectXss from "@vulcn/plugin-detect-xss";
+import detectReflection from "@vulcn/plugin-detect-reflection";
+import fs from "fs/promises";
+
+async function runTests(sessionPath: string) {
+  // Load session
+  const yaml = await fs.readFile(sessionPath, "utf-8");
+  const session = parseSession(yaml);
+
+  // Set up plugins
+  const manager = new PluginManager();
+  manager.addPlugin(payloadsPlugin, {
+    builtin: true,
+    include: ["xss-basic", "sqli-basic"],
+  });
+  manager.addPlugin(detectXss, { detectDialogs: true });
+  manager.addPlugin(detectReflection, { detectScript: true });
+  await manager.initialize();
+
+  // Run tests
+  console.log(`Testing ${session.name}...`);
+
+  const result = await Runner.execute(
+    session,
+    {
+      headless: true,
+      onFinding: (f) => console.log(`Found: ${f.title}`),
+    },
+    { pluginManager: manager },
+  );
+
+  // Summary
+  console.log(`\nResults:`);
+  console.log(`  Steps: ${result.stepsExecuted}`);
+  console.log(`  Payloads: ${result.payloadsTested}`);
+  console.log(`  Duration: ${(result.duration / 1000).toFixed(1)}s`);
+  console.log(`  Findings: ${result.findings.length}`);
+
+  // Cleanup
+  await manager.destroy();
+
+  // Exit with error code if findings
+  process.exit(result.findings.length > 0 ? 1 : 0);
+}
+
+runTests("session.vulcn.yml");
+```

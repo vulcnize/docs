@@ -1,0 +1,104 @@
+---
+title: "CLI Overview"
+description: "Complete reference for all Vulcn CLI commands"
+---
+
+## Usage
+
+```bash
+vulcn [command] [options]
+```
+
+## Global Options
+
+| Option          | Description               |
+| --------------- | ------------------------- |
+| `-V, --version` | Output the version number |
+| `-h, --help`    | Display help for command  |
+
+## Commands
+
+<CardGroup cols={2}>
+  <Card title="record" icon="circle-dot" href="/cli/record">
+    Record browser interactions into a session file
+  </Card>
+  <Card title="run" icon="play" href="/cli/run">
+    Run security tests on a recorded session
+  </Card>
+  <Card title="payloads" icon="syringe" href="/cli/payloads">
+    List available payload sets
+  </Card>
+  <Card title="plugin" icon="plug" href="/cli/plugin">
+    Manage plugins in your configuration
+  </Card>
+  <Card title="init" icon="wand-magic-sparkles" href="/cli/init">
+    Create a vulcn.config.yml file
+  </Card>
+  <Card title="install" icon="download" href="/cli/record">
+    Install Playwright browsers
+  </Card>
+</CardGroup>
+
+## Quick Reference
+
+| Command                      | Description                 |
+| ---------------------------- | --------------------------- |
+| `vulcn record <url>`         | Record browser interactions |
+| `vulcn run <session>`        | Run security tests          |
+| `vulcn payloads`             | List available payloads     |
+| `vulcn plugin list`          | List configured plugins     |
+| `vulcn plugin add <name>`    | Add a plugin                |
+| `vulcn plugin remove <name>` | Remove a plugin             |
+| `vulcn init`                 | Create config file          |
+| `vulcn install`              | Install browsers            |
+| `vulcn doctor`               | Check environment           |
+
+## Examples
+
+### Basic Workflow
+
+```bash
+# Initialize configuration
+vulcn init
+
+# Record a session
+vulcn record https://example.com -o session.vulcn.yml
+
+# Run with default payloads
+vulcn run session.vulcn.yml
+
+# Run with specific payloads
+vulcn run session.vulcn.yml --payload xss-basic sqli-basic
+```
+
+### Plugin Management
+
+```bash
+# List configured plugins
+vulcn plugin list
+
+# Add a detection plugin
+vulcn plugin add @vulcn/plugin-detect-reflection
+
+# Disable a plugin temporarily
+vulcn plugin disable @vulcn/plugin-detect-xss
+
+# Remove a plugin
+vulcn plugin remove @vulcn/plugin-detect-reflection
+```
+
+### Browser Management
+
+```bash
+# Check which browsers are installed
+vulcn doctor
+
+# Install Chromium (default)
+vulcn install
+
+# Install all browsers
+vulcn install --all
+
+# Use Firefox for recording
+vulcn record https://example.com --browser firefox
+```

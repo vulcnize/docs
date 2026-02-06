@@ -1,0 +1,187 @@
+---
+title: "Recorder"
+description: "Record browser sessions programmatically"
+---
+
+## Overview
+
+The `Recorder` class captures browser interactions into a replayable session.
+
+## Static Methods
+
+### Recorder.start
+
+Start a new recording session.
+
+```typescript
+static async start(
+  url: string,
+  options?: RecorderOptions
+): Promise<Recording>
+```
+
+**Parameters:**
+
+| Name      | Type            | Description       |
+| --------- | --------------- | ----------------- |
+| `url`     | string          | Starting URL      |
+| `options` | RecorderOptions | Recording options |
+
+**Returns:** `Recording` instance
+
+**Example:**
+
+```typescript
+import { Recorder } from "@vulcn/engine";
+
+const recording = await Recorder.start("https://example.com", {
+  browser: "chromium",
+  headless: false,
+  viewport: { width: 1280, height: 720 },
+});
+
+// Browser is now open and recording
+// User interacts with the page...
+
+const session = await recording.stop();
+```
+
+## RecorderOptions
+
+```typescript
+interface RecorderOptions {
+  /** Browser to use (default: "chromium") */
+  browser?: "chromium" | "firefox" | "webkit";
+
+  /** Viewport size */
+  viewport?: { width: number; height: number };
+
+  /** Run headless (default: false for recording) */
+  headless?: boolean;
+}
+```
+
+## Recording Instance
+
+### recording.stop
+
+Stop recording and return the session.
+
+```typescript
+async stop(): Promise<Session>
+```
+
+**Returns:** Complete `Session` object with all recorded steps
+
+**Example:**
+
+```typescript
+const session = await recording.stop();
+
+console.log(`Recorded ${session.steps.length} steps`);
+console.log(`Start URL: ${session.startUrl}`);
+```
+
+### recording.abort
+
+Abort recording without saving.
+
+```typescript
+async abort(): Promise<void>
+```
+
+### recording.getSteps
+
+Get steps recorded so far (during active recording).
+
+```typescript
+getSteps(): Step[]
+```
+
+### recording.addStep
+
+Manually add a step to the recording.
+
+```typescript
+addStep(step: Step): void
+```
+
+**Example:**
+
+```typescript
+recording.addStep({
+  id: "custom_step_001",
+  type: "navigate",
+  url: "https://example.com/page",
+  timestamp: Date.now(),
+});
+```
+
+## Session Format
+
+The returned session object:
+
+```typescript
+interface Session {
+  name: string;
+  startUrl: string;
+  browser: BrowserType;
+  steps: Step[];
+}
+
+interface Step {
+  id: string;
+  type: "navigate" | "click" | "fill" | "select" | "check";
+  timestamp: number;
+  url?: string;
+  selector?: string;
+  value?: string;
+}
+```
+
+## Serialization
+
+Convert sessions to/from YAML:
+
+```typescript
+import { parseSession, stringifySession } from "@vulcn/engine";
+
+// Session to YAML
+const yaml = stringifySession(session);
+await fs.writeFile("session.vulcn.yml", yaml);
+
+// YAML to Session
+const content = await fs.readFile("session.vulcn.yml", "utf-8");
+const session = parseSession(content);
+```
+
+## Complete Example
+
+```typescript
+import { Recorder, stringifySession } from "@vulcn/engine";
+import fs from "fs/promises";
+
+async function recordSession(url: string, outputPath: string) {
+  console.log(`Recording session from ${url}...`);
+
+  const recording = await Recorder.start(url, {
+    browser: "chromium",
+    headless: false,
+  });
+
+  console.log("Browser opened. Interact with the page, then close it.");
+
+  // Wait for browser to close
+  const session = await recording.stop();
+
+  console.log(`Recorded ${session.steps.length} steps`);
+
+  // Save to file
+  const yaml = stringifySession(session);
+  await fs.writeFile(outputPath, yaml);
+
+  console.log(`Saved to ${outputPath}`);
+}
+
+recordSession("https://example.com", "session.vulcn.yml");
+```

@@ -1,0 +1,303 @@
+---
+title: "Creating Plugins"
+description: "Build custom Vulcn plugins for detection, payloads, and reporting"
+---
+
+## Getting Started
+
+A Vulcn plugin is a JavaScript/TypeScript module that exports a plugin object with hooks.
+
+### Minimal Plugin
+
+```typescript
+import type { VulcnPlugin } from "@vulcn/engine";
+
+const plugin: VulcnPlugin = {
+  name: "my-plugin",
+  version: "1.0.0",
+
+  hooks: {
+    onInit: async (ctx) => {
+      ctx.logger.info("Plugin initialized!");
+    },
+  },
+};
+
+export default plugin;
+```
+
+## Plugin Structure
+
+```typescript
+interface VulcnPlugin {
+  // Required
+  name: string; // Unique plugin name
+  version: string; // Semantic version
+
+  // Optional
+  apiVersion?: number; // Plugin API version (default: 1)
+  description?: string; // Human-readable description
+  configSchema?: ZodSchema; // Configuration validation
+
+  // Hooks
+  hooks?: {
+    onInit?: (ctx: PluginContext) => Promise<void>;
+    onDestroy?: (ctx: PluginContext) => Promise<void>;
+    // ... more hooks
+  };
+
+  // Provide payloads
+  payloads?: RuntimePayload[] | (() => Promise<RuntimePayload[]>);
+}
+```
+
+## Creating a Detection Plugin
+
+Detection plugins use browser event hooks (`onDialog`, `onConsoleMessage`) or `onAfterPayload` to find vulnerabilities.
+
+### Example: Custom Error Detection
+
+```typescript
+import { z } from "zod";
+import type { VulcnPlugin, DetectContext, Finding } from "@vulcn/engine";
+
+const configSchema = z.object({
+  errorPatterns: z
+    .array(z.string())
+    .default([
+      "SQL syntax",
+      "mysql_fetch",
+      "pg_query",
+      "ORA-",
+      "Microsoft SQL",
+    ]),
+  severity: z.enum(["critical", "high", "medium", "low"]).default("medium"),
+});
+
+const plugin: VulcnPlugin = {
+  name: "my-error-detector",
+  version: "1.0.0",
+  description: "Detects SQL error messages in responses",
+  configSchema,
+
+  hooks: {
+    onAfterPayload: async (ctx: DetectContext): Promise<Finding[]> => {
+      const config = configSchema.parse(ctx.config);
+      const findings: Finding[] = [];
+
+      // Get page content
+      const html = await ctx.page.content();
+
+      for (const pattern of config.errorPatterns) {
+        if (html.includes(pattern)) {
+          findings.push({
+            type: "sqli",
+            severity: config.severity,
+            title: `SQL Error Detected: ${pattern}`,
+            description: `The response contains SQL error message "${pattern}"`,
+            stepId: ctx.stepId,
+            payload: ctx.payloadValue,
+            url: ctx.page.url(),
+            evidence: pattern,
+            metadata: {
+              detectionMethod: "error-message",
+              pattern,
+            },
+          });
+          break; // One finding per payload
+        }
+      }
+
+      return findings;
+    },
+  },
+};
+
+export default plugin;
+```
+
+## Creating a Payload Plugin
+
+Payload plugins provide payloads via the `payloads` property or `onInit` hook.
+
+### Example: Custom Payload Loader
+
+```typescript
+import type { VulcnPlugin, RuntimePayload } from "@vulcn/engine";
+
+const plugin: VulcnPlugin = {
+  name: "my-payload-loader",
+  version: "1.0.0",
+
+  // Static payloads
+  payloads: [
+    {
+      name: "my-custom-xss",
+      category: "xss",
+      description: "Custom XSS payloads",
+      payloads: [
+        "<script>alert('custom')</script>",
+        "<img src=x onerror=alert('custom')>",
+      ],
+      detectPatterns: [/alert\('custom'\)/],
+      source: "plugin",
+    },
+  ],
+};
+
+export default plugin;
+```
+
+### Dynamic Payloads
+
+```typescript
+const plugin: VulcnPlugin = {
+  name: "my-dynamic-loader",
+  version: "1.0.0",
+
+  // Async payload loading
+  payloads: async () => {
+    const response = await fetch("https://api.example.com/payloads");
+    const data = await response.json();
+
+    return data.map((p) => ({
+      name: p.name,
+      category: p.category,
+      description: p.description,
+      payloads: p.values,
+      detectPatterns: [],
+      source: "plugin" as const,
+    }));
+  },
+};
+```
+
+## Configuration Validation
+
+Use Zod for type-safe configuration:
+
+```typescript
+import { z } from "zod";
+
+const configSchema = z.object({
+  enabled: z.boolean().default(true),
+  threshold: z.number().min(0).max(100).default(50),
+  patterns: z.array(z.string()).default([]),
+});
+
+const plugin: VulcnPlugin = {
+  name: "my-plugin",
+  version: "1.0.0",
+  configSchema,
+
+  hooks: {
+    onInit: async (ctx) => {
+      // Config is validated and typed
+      const config = configSchema.parse(ctx.config);
+      console.log(config.threshold); // number
+    },
+  },
+};
+```
+
+## Using the Logger
+
+All hooks receive a scoped logger:
+
+```typescript
+hooks: {
+  onInit: async (ctx) => {
+    ctx.logger.debug("Debug message");
+    ctx.logger.info("Info message");
+    ctx.logger.warn("Warning message");
+    ctx.logger.error("Error message");
+  },
+}
+```
+
+Output:
+
+```
+[my-plugin] Debug message
+[my-plugin] Info message
+[my-plugin] Warning message
+[my-plugin] Error message
+```
+
+## Publishing Your Plugin
+
+### Package Structure
+
+```
+my-vulcn-plugin/
+├── src/
+│   └── index.ts
+├── dist/
+│   ├── index.js
+│   ├── index.cjs
+│   └── index.d.ts
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+### package.json
+
+```json
+{
+  "name": "vulcn-plugin-my-detector",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "peerDependencies": {
+    "@vulcn/engine": ">=0.2.0"
+  },
+  "keywords": ["vulcn", "plugin", "security"]
+}
+```
+
+### tsup.config.ts
+
+```typescript
+import { defineConfig } from "tsup";
+
+export default defineConfig({
+  entry: ["src/index.ts"],
+  format: ["esm", "cjs"],
+  dts: true,
+  clean: true,
+  sourcemap: true,
+});
+```
+
+## Using Your Plugin
+
+### Local Development
+
+```yaml
+plugins:
+  - name: "./my-plugin/dist/index.js"
+    config:
+      threshold: 75
+```
+
+### Published Package
+
+```yaml
+plugins:
+  - name: "vulcn-plugin-my-detector"
+    config:
+      threshold: 75
+```
+
+<Card title="Plugin API Reference" icon="code" href="/plugins/plugin-api">
+  See the complete API reference
+</Card>

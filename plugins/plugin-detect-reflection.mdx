@@ -1,0 +1,186 @@
+---
+title: "@vulcn/plugin-detect-reflection"
+description: "Pattern-based reflection detection plugin"
+---
+
+## Overview
+
+This plugin detects when payloads appear in the response HTML (reflection). While not proof of XSS, reflection is often a precursor to exploitation—it shows that input is not properly sanitized.
+
+## Reflection vs Execution
+
+| Detection           | Confidence | What It Proves          |
+| ------------------- | ---------- | ----------------------- |
+| **Reflection**      | Medium     | Payload appears in HTML |
+| **Execution** (XSS) | High       | JavaScript actually ran |
+
+Use both for comprehensive coverage:
+
+- **Reflection** catches more potential issues
+- **Execution** confirms exploitability
+
+## Installation
+
+```bash
+npm install @vulcn/plugin-detect-reflection
+```
+
+## Configuration
+
+```yaml
+plugins:
+  - name: "@vulcn/plugin-detect-reflection"
+    config:
+      enabled: true
+      minPayloadLength: 4
+      detectBody: true
+      detectScript: true
+      detectAttribute: true
+      bodySeverity: low
+      scriptSeverity: medium
+      attributeSeverity: medium
+      dangerousPatterns:
+        - onerror
+        - onclick
+        - javascript:
+```
+
+## Options
+
+| Option              | Type     | Default    | Description                         |
+| ------------------- | -------- | ---------- | ----------------------------------- |
+| `enabled`           | boolean  | `true`     | Enable reflection detection         |
+| `minPayloadLength`  | number   | `4`        | Skip payloads shorter than this     |
+| `detectBody`        | boolean  | `true`     | Detect reflection in HTML body      |
+| `detectScript`      | boolean  | `true`     | Detect reflection in script context |
+| `detectAttribute`   | boolean  | `true`     | Detect reflection in attributes     |
+| `bodySeverity`      | string   | `"low"`    | Severity for body reflection        |
+| `scriptSeverity`    | string   | `"medium"` | Severity for script reflection      |
+| `attributeSeverity` | string   | `"medium"` | Severity for attribute reflection   |
+| `dangerousPatterns` | string[] | See below  | Patterns that increase severity     |
+
+### Default Dangerous Patterns
+
+```yaml
+dangerousPatterns:
+  - onerror
+  - onclick
+  - onload
+  - onmouseover
+  - onfocus
+  - javascript:
+  - eval(
+  - document.write
+  - innerHTML
+```
+
+## Context Detection
+
+The plugin analyzes where the reflection occurs:
+
+### Body Context
+
+```html
+<div>
+  Your search:
+  <script>
+    alert("XSS");
+  </script>
+</div>
+```
+
+Severity: **Low** (may be HTML-encoded)
+
+### Script Context
+
+```html
+<script>
+  var query = '<script>alert('XSS')</script>';
+</script>
+```
+
+Severity: **Medium** (dangerous, likely exploitable)
+
+### Attribute Context
+
+```html
+<input value="<script>alert('XSS')</script>" />
+```
+
+Severity: **Medium** (may break out of attribute)
+
+## Example Findings
+
+### Body Reflection
+
+```json
+{
+  "type": "reflection",
+  "severity": "low",
+  "title": "Payload Reflected in HTML body",
+  "description": "Input payload was reflected back in the HTML body.",
+  "evidence": "...Your search: <script>alert('XSS')</script>...",
+  "metadata": {
+    "detectionMethod": "reflection",
+    "context": "body",
+    "dangerousPattern": null
+  }
+}
+```
+
+### Script Reflection with Dangerous Pattern
+
+```json
+{
+  "type": "reflection",
+  "severity": "high",
+  "title": "Payload Reflected in script context",
+  "description": "Input payload was reflected in script context near dangerous pattern \"onerror\".",
+  "metadata": {
+    "detectionMethod": "reflection",
+    "context": "script",
+    "dangerousPattern": "onerror"
+  }
+}
+```
+
+## Reducing False Positives
+
+### Minimum Payload Length
+
+Short payloads like `1` or `test` may appear naturally in the page:
+
+```yaml
+minPayloadLength: 6 # Skip short payloads
+```
+
+### Disable Body Detection
+
+If you're getting too many low-confidence findings:
+
+```yaml
+detectBody: false
+detectScript: true
+detectAttribute: true
+```
+
+## Recommended Configuration
+
+For balanced detection:
+
+```yaml
+plugins:
+  - name: "@vulcn/plugin-detect-xss"
+    config:
+      detectDialogs: true
+      severity: high
+
+  - name: "@vulcn/plugin-detect-reflection"
+    config:
+      detectBody: false # Skip low-confidence body reflection
+      detectScript: true # Catch script context (dangerous)
+      detectAttribute: true # Catch attribute context
+      scriptSeverity: high # Upgrade script context to high
+```
+
+This focuses on high-value findings while reducing noise.

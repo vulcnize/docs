@@ -1,0 +1,110 @@
+---
+title: "Configuration Overview"
+description: "Configure Vulcn with vulcn.config.yml"
+---
+
+## Configuration File
+
+Vulcn uses a YAML configuration file to manage plugins and settings. The file can be named:
+
+- `vulcn.config.yml` (recommended)
+- `vulcn.config.yaml`
+- `vulcn.config.json`
+- `.vulcnrc.yml`
+- `.vulcnrc.yaml`
+- `.vulcnrc.json`
+
+## Quick Start
+
+Create a configuration file with default settings:
+
+```bash
+vulcn init
+```
+
+## Full Example
+
+```yaml
+# vulcn.config.yml
+version: "1"
+
+plugins:
+  # Payload loading
+  - name: "@vulcn/plugin-payloads"
+    config:
+      builtin: true
+      include:
+        - xss-basic
+        - sqli-basic
+      payloadbox:
+        - xss
+      files:
+        - ./custom-payloads.yml
+
+  # XSS detection (execution-based)
+  - name: "@vulcn/plugin-detect-xss"
+    config:
+      detectDialogs: true
+      detectConsole: true
+      consoleMarker: "VULCN_XSS:"
+      severity: high
+
+  # Reflection detection (pattern-based)
+  - name: "@vulcn/plugin-detect-reflection"
+    config:
+      detectBody: true
+      detectScript: true
+      detectAttribute: true
+      bodySeverity: low
+      scriptSeverity: medium
+
+settings:
+  browser: chromium
+  headless: true
+  timeout: 30000
+```
+
+## Schema
+
+```yaml
+version: "1" # Config version (required)
+
+plugins: # Array of plugins
+  - name: string # Plugin package name
+    config: object # Plugin-specific configuration
+    enabled: boolean # Enable/disable (default: true)
+
+settings: # Global settings
+  browser: string # chromium | firefox | webkit
+  headless: boolean # Run headless
+  timeout: number # Timeout in milliseconds
+```
+
+## Sections
+
+<CardGroup cols={2}>
+  <Card title="Plugins" icon="plug" href="/config/plugins">
+    Configure plugins and their options
+  </Card>
+  <Card title="Settings" icon="gear" href="/config/settings">
+    Global runtime settings
+  </Card>
+</CardGroup>
+
+## Config Resolution
+
+Vulcn searches for configuration files in this order:
+
+1. Path specified via `--config` flag
+2. `vulcn.config.yml` in current directory
+3. `vulcn.config.yaml` in current directory
+4. `vulcn.config.json` in current directory
+5. `.vulcnrc.yml` in current directory
+6. `.vulcnrc.yaml` in current directory
+7. `.vulcnrc.json` in current directory
+
+If no config file is found, Vulcn uses defaults:
+
+- No plugins configured (but CLI auto-loads `@vulcn/plugin-detect-xss`)
+- Browser: chromium
+- Headless: true

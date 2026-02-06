@@ -1,43 +1,67 @@
-# Mintlify Starter Kit
+# Vulcn Documentation
 
-Use the starter kit to get your docs deployed and ready to customize.
-
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
-
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
-
-**[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
+This is the official documentation for [Vulcn](https://github.com/vulcnize/vulcn), a security testing tool that records browser interactions and replays them with security payloads.
 
 ## Development
 
-Install the [Mintlify CLI](https://www.npmjs.com/package/mint) to preview your documentation changes locally. To install, use the following command:
+### Prerequisites
 
-```
+- Node.js v18-24 (Mintlify CLI doesn't support Node 25+)
+- npm
+
+### Install Mintlify CLI
+
+```bash
 npm i -g mint
 ```
 
-Run the following command at the root of your documentation, where your `docs.json` is located:
+### Run locally
 
-```
+```bash
 mint dev
 ```
 
-View your local preview at `http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000) to view the docs.
 
-## Publishing changes
+### Build
 
-Install our GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app) to propagate changes from your repo to your deployment. Changes are deployed to production automatically after pushing to the default branch.
+The docs are automatically deployed via Mintlify when changes are pushed to the main branch.
 
-## Need help?
+## Structure
 
-### Troubleshooting
+```
+docs/
+├── index.mdx              # Introduction
+├── quickstart.mdx         # Getting started guide
+├── installation.mdx       # Installation guide
+├── cli/                   # CLI command reference
+│   ├── overview.mdx
+│   ├── record.mdx
+│   ├── run.mdx
+│   ├── payloads.mdx
+│   ├── plugin.mdx
+│   └── init.mdx
+├── config/                # Configuration reference
+│   ├── overview.mdx
+│   ├── plugins.mdx
+│   └── settings.mdx
+├── plugins/               # Plugin documentation
+│   ├── overview.mdx
+│   ├── hooks.mdx
+│   ├── plugin-payloads.mdx
+│   ├── plugin-detect-xss.mdx
+│   ├── plugin-detect-reflection.mdx
+│   ├── creating-plugins.mdx
+│   └── plugin-api.mdx
+├── api/                   # Programmatic API
+│   ├── overview.mdx
+│   ├── recorder.mdx
+│   ├── runner.mdx
+│   ├── plugin-manager.mdx
+│   └── types.mdx
+└── docs.json              # Mintlify config
+```
 
-- If your dev environment isn't running: Run `mint update` to ensure you have the most recent version of the CLI.
-- If a page loads as a 404: Make sure you are running in a folder with a valid `docs.json`.
+## License
 
-### Resources
-- [Mintlify documentation](https://mintlify.com/docs)
+AGPL-3.0

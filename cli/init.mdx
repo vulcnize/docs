@@ -1,0 +1,100 @@
+---
+title: "vulcn init"
+description: "Create a vulcn.config.yml file"
+---
+
+## Usage
+
+```bash
+vulcn init [options]
+```
+
+## Options
+
+| Option        | Description                    |
+| ------------- | ------------------------------ |
+| `-f, --force` | Overwrite existing config file |
+
+## Description
+
+The `init` command creates a `vulcn.config.yml` file in the current directory with default settings and official plugins pre-configured.
+
+## Examples
+
+### Basic Initialization
+
+```bash
+vulcn init
+```
+
+Output:
+
+```bash
+✔ Created vulcn.config.yml
+
+📁 Configuration created
+
+Next steps:
+  1. Record a session:
+     vulcn record https://example.com -o session.vulcn.yml
+
+  2. Run security tests:
+     vulcn run session.vulcn.yml
+
+  3. Customize payloads:
+     vulcn run session.vulcn.yml --payload xss-basic sqli-basic
+```
+
+### Overwrite Existing
+
+```bash
+vulcn init --force
+```
+
+## Generated Configuration
+
+The generated `vulcn.config.yml`:
+
+```yaml
+# Vulcn Configuration
+# Docs: https://rawlab.dev/vulcn/config
+
+version: "1"
+plugins:
+  - name: "@vulcn/plugin-payloads"
+    config:
+      builtin: true
+  - name: "@vulcn/plugin-detect-xss"
+    config:
+      detectDialogs: true
+      detectConsole: true
+      severity: high
+settings:
+  browser: chromium
+  headless: true
+```
+
+## What's Included
+
+### @vulcn/plugin-payloads
+
+The payloads plugin is configured with:
+
+- **builtin: true** - Enables all 13 built-in payload sets (91 payloads)
+
+### @vulcn/plugin-detect-xss
+
+The XSS detection plugin is configured with:
+
+- **detectDialogs: true** - Monitors `alert()`, `confirm()`, `prompt()`
+- **detectConsole: true** - Detects console markers
+- **severity: high** - Findings marked as high severity
+
+### Settings
+
+- **browser: chromium** - Uses Chromium by default
+- **headless: true** - Runs tests in headless mode
+
+<Card title="Configuration Reference" icon="gear" href="/config/overview">
+  Learn about all configuration options
+</Card>

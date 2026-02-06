@@ -1,97 +1,141 @@
 ---
 title: "Introduction"
-description: "Welcome to the new home for your documentation"
+description: "Record once, test everywhere. Browser-based security testing with XSS & SQLi payloads."
 ---
 
-## Setting up
+<img
+  className="block dark:hidden"
+  src="/images/vulcn-hero-light.svg"
+  alt="Vulcn Hero"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/vulcn-hero-dark.svg"
+  alt="Vulcn Hero"
+/>
 
-Get your documentation site up and running in minutes.
+## What is Vulcn?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+Vulcn is a **security testing tool** that makes it easy to find vulnerabilities in web applications. Instead of manually testing each input field with different payloads, Vulcn lets you:
 
-## Make it yours
+1. **Record** browser interactions once (clicks, form fills, navigation)
+2. **Replay** sessions with security payloads injected into inputs
+3. **Detect** vulnerabilities via plugin hooks (dialogs, console, patterns)
 
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running in under 5 minutes
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Explore all available commands
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Plugins" icon="plug" href="/plugins/overview">
+    Extend Vulcn with detection plugins
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Use Vulcn programmatically
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Key Features
 
-Everything you need to create world-class documentation.
+<AccordionGroup>
+  <Accordion title="🎬 Session Recording" icon="video">
+    Record your browser interactions and Vulcn captures them as a replayable
+    session. No need to write test scripts—just use the application normally.
+    ```bash vulcn record https://example.com --output session.vulcn.yml ```
+  </Accordion>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+  <Accordion title="💉 Payload Injection" icon="syringe">
+    Vulcn automatically injects security payloads into form inputs during
+    replay. Built-in payloads cover XSS, SQLi, SSRF, XXE, and more. ```bash
+    vulcn run session.vulcn.yml --payload xss-basic sqli-basic ```
+  </Accordion>
 
-## Need inspiration?
+  <Accordion title="🔌 Plugin System" icon="plug">
+    Extend Vulcn with plugins for custom detection, payload loading, and
+    reporting. The hook-based architecture makes it easy to add new
+    capabilities. ```yaml # vulcn.config.yml plugins: - name:
+    "@vulcn/plugin-detect-xss" - name: "@vulcn/plugin-detect-reflection" ```
+  </Accordion>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
+  <Accordion title="🎯 Execution-Based Detection" icon="bullseye">
+    Unlike pattern-matching tools, Vulcn detects **actual JavaScript
+    execution**—when `alert()` fires, you know the XSS is real.
+  </Accordion>
+</AccordionGroup>
+
+## How It Works
+
+```mermaid
+flowchart LR
+    A[Record Session] --> B[Session File]
+    B --> C[Replay with Payloads]
+    C --> D{Vulnerability?}
+    D -->|Yes| E[Finding Reported]
+    D -->|No| F[Continue Testing]
+    F --> C
+```
+
+<Steps>
+  <Step title="Record a Session">
+    Open a browser window and interact with your application. Vulcn captures
+    every click, input, and navigation.
+  </Step>
+  <Step title="Choose Payloads">
+    Select from built-in payloads (XSS, SQLi, etc.) or load custom ones from
+    files or PayloadsAllTheThings.
+  </Step>
+  <Step title="Run Tests">
+    Vulcn replays your session, injecting each payload into every input field
+    and monitoring for vulnerabilities.
+  </Step>
+  <Step title="Review Findings">
+    Get detailed reports of confirmed vulnerabilities with evidence, payloads,
+    and affected URLs.
+  </Step>
+</Steps>
+
+## Installation
+
+<CodeGroup>
+
+```bash npm
+npm install -g vulcn
+```
+
+```bash pnpm
+pnpm add -g vulcn
+```
+
+```bash yarn
+yarn global add vulcn
+```
+
+</CodeGroup>
+
+<Note>
+  Vulcn uses Playwright for browser automation. Browsers will be installed
+  automatically on first use, or you can run `vulcn install` to install them
+  manually.
+</Note>
+
+## Quick Example
+
+```bash
+# Initialize configuration
+vulcn init
+
+# Record a session (opens browser)
+vulcn record https://vulnerable-app.com --output session.vulcn.yml
+
+# Run security tests
+vulcn run session.vulcn.yml
+
+# List available payloads
+vulcn payloads
+```
+
+<Card title="Ready to start?" icon="rocket" href="/quickstart">
+  Follow our quickstart guide to find your first vulnerability
 </Card>

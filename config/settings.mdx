@@ -1,0 +1,132 @@
+---
+title: "Settings"
+description: "Global settings in vulcn.config.yml"
+---
+
+## Settings Object
+
+Global settings are configured under the `settings` key:
+
+```yaml
+settings:
+  browser: chromium
+  headless: true
+  timeout: 30000
+```
+
+## Available Settings
+
+| Setting    | Type    | Default      | Description             |
+| ---------- | ------- | ------------ | ----------------------- |
+| `browser`  | string  | `"chromium"` | Browser to use          |
+| `headless` | boolean | `true`       | Run in headless mode    |
+| `timeout`  | number  | `30000`      | Timeout in milliseconds |
+
+## Browser
+
+Choose which browser to use for recording and testing:
+
+```yaml
+settings:
+  browser: chromium # or firefox, webkit
+```
+
+Available browsers:
+
+| Browser    | Description                          |
+| ---------- | ------------------------------------ |
+| `chromium` | Google Chrome/Chromium (recommended) |
+| `firefox`  | Mozilla Firefox                      |
+| `webkit`   | Safari/WebKit                        |
+
+<Tip>
+  Chromium is recommended for most use cases. It has the best compatibility and
+  performance.
+</Tip>
+
+### Installing Browsers
+
+```bash
+# Install specific browser
+vulcn install chromium
+
+# Install all browsers
+vulcn install --all
+
+# Check installed browsers
+vulcn doctor
+```
+
+## Headless Mode
+
+Control whether the browser runs with a visible window:
+
+```yaml
+settings:
+  headless: true   # No visible window (faster, CI/CD friendly)
+  headless: false  # Visible window (for debugging)
+```
+
+### CLI Override
+
+Override headless mode from the command line:
+
+```bash
+# Run with visible browser
+vulcn run session.vulcn.yml --no-headless
+
+# Force headless mode
+vulcn run session.vulcn.yml --headless
+```
+
+## Timeout
+
+Set the maximum time to wait for page operations:
+
+```yaml
+settings:
+  timeout: 30000 # 30 seconds
+```
+
+<Note>
+  The timeout applies to navigation, element interactions, and other page
+  operations. Increase it for slow applications.
+</Note>
+
+## Environment Variables
+
+Some settings can be overridden via environment variables:
+
+| Variable         | Description                             |
+| ---------------- | --------------------------------------- |
+| `VULCN_BROWSER`  | Override default browser                |
+| `VULCN_HEADLESS` | Override headless mode (`true`/`false`) |
+| `DEBUG=vulcn:*`  | Enable debug logging                    |
+
+```bash
+# Run with Firefox in visible mode
+VULCN_BROWSER=firefox VULCN_HEADLESS=false vulcn run session.vulcn.yml
+```
+
+## Complete Example
+
+```yaml
+# vulcn.config.yml
+version: "1"
+
+plugins:
+  - name: "@vulcn/plugin-payloads"
+    config:
+      builtin: true
+
+  - name: "@vulcn/plugin-detect-xss"
+    config:
+      detectDialogs: true
+      detectConsole: true
+      severity: high
+
+settings:
+  browser: chromium
+  headless: true
+  timeout: 30000
+```

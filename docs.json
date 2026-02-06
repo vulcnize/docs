@@ -1,69 +1,75 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Vulcn",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#DC2626",
+    "light": "#EF4444",
+    "dark": "#991B1B"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/favicon.ico",
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
+            "pages": ["index", "quickstart", "installation"]
+          },
+          {
+            "group": "CLI Reference",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "cli/overview",
+              "cli/record",
+              "cli/run",
+              "cli/payloads",
+              "cli/plugin",
+              "cli/init"
             ]
           },
           {
-            "group": "Customization",
-            "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
-            ]
+            "group": "Configuration",
+            "pages": ["config/overview", "config/plugins", "config/settings"]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Plugins",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Plugin System",
+            "pages": ["plugins/overview", "plugins/hooks"]
+          },
+          {
+            "group": "Official Plugins",
             "pages": [
-              "api-reference/introduction"
+              "plugins/plugin-payloads",
+              "plugins/plugin-detect-xss",
+              "plugins/plugin-detect-reflection"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Custom Plugins",
+            "pages": ["plugins/creating-plugins", "plugins/plugin-api"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Engine API",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/overview",
+              "api/recorder",
+              "api/runner",
+              "api/plugin-manager"
             ]
+          },
+          {
+            "group": "Types",
+            "pages": ["api/types"]
           }
         ]
       }
@@ -71,52 +77,39 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "GitHub",
+          "href": "https://github.com/vulcnize/vulcn",
+          "icon": "github"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "vulcn.dev",
+          "href": "https://vulcn.dev",
+          "icon": "globe"
         }
       ]
     }
   },
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "light": "/logo/vulcn.png",
+    "dark": "/logo/vulcn.png"
   },
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "label": "GitHub",
+        "href": "https://github.com/vulcnize/vulcn"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Get Started",
+      "href": "/quickstart"
     }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "x": "https://x.com/rawlabdev",
+      "github": "https://github.com/vulcnize"
     }
   }
 }

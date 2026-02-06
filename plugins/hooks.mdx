@@ -1,0 +1,261 @@
+---
+title: "Plugin Hooks"
+description: "Available hooks for Vulcn plugins"
+---
+
+## Hook Categories
+
+Vulcn provides hooks for different lifecycle phases:
+
+| Category           | Hooks                                                         | When Called              |
+| ------------------ | ------------------------------------------------------------- | ------------------------ |
+| **Initialization** | `onInit`, `onDestroy`                                         | Plugin setup/teardown    |
+| **Recording**      | `onRecordStart`, `onRecordStep`, `onRecordEnd`                | During session recording |
+| **Running**        | `onRunStart`, `onBeforePayload`, `onAfterPayload`, `onRunEnd` | During test execution    |
+| **Browser Events** | `onDialog`, `onConsoleMessage`, `onPageLoad`                  | Browser activity         |
+
+## Initialization Hooks
+
+### onInit
+
+Called when the plugin is initialized.
+
+```typescript
+onInit?: (ctx: PluginContext) => Promise<void>;
+```
+
+**Use cases:**
+
+- Load configuration
+- Set up resources
+- Register payloads
+
+### onDestroy
+
+Called when the plugin is destroyed.
+
+```typescript
+onDestroy?: (ctx: PluginContext) => Promise<void>;
+```
+
+**Use cases:**
+
+- Clean up resources
+- Save state
+- Close connections
+
+## Recording Hooks
+
+### onRecordStart
+
+Called when recording begins.
+
+```typescript
+onRecordStart?: (ctx: RecordContext) => Promise<void>;
+```
+
+**Context includes:**
+
+- `startUrl` - Initial URL
+- `browser` - Browser type
+- `page` - Playwright page object
+
+### onRecordStep
+
+Called after each step is recorded. Can modify or filter steps.
+
+```typescript
+onRecordStep?: (step: Step, ctx: RecordContext) => Promise<Step | null>;
+```
+
+**Return value:**
+
+- `Step` - Modified step to record
+- `null` - Skip this step
+
+**Example:**
+
+```typescript
+onRecordStep: async (step, ctx) => {
+  // Skip external navigation
+  if (step.type === "navigate" && !step.url.includes("example.com")) {
+    return null;
+  }
+  return step;
+};
+```
+
+### onRecordEnd
+
+Called when recording ends. Can modify the final session.
+
+```typescript
+onRecordEnd?: (session: Session, ctx: RecordContext) => Promise<Session>;
+```
+
+## Running Hooks
+
+### onRunStart
+
+Called when test execution begins.
+
+```typescript
+onRunStart?: (ctx: RunContext) => Promise<void>;
+```
+
+**Context includes:**
+
+- `session` - Session being executed
+- `page` - Playwright page object
+- `headless` - Whether running headless
+
+### onBeforePayload
+
+Called before each payload is injected. Can modify the payload.
+
+```typescript
+onBeforePayload?: (
+  payload: string,
+  step: Step,
+  ctx: RunContext
+) => Promise<string>;
+```
+
+**Example:**
+
+```typescript
+onBeforePayload: async (payload, step, ctx) => {
+  // Add prefix to all payloads
+  return `PREFIX_${payload}`;
+};
+```
+
+### onAfterPayload
+
+Called after each payload is injected. Can return findings.
+
+```typescript
+onAfterPayload?: (ctx: DetectContext) => Promise<Finding[]>;
+```
+
+**Context includes:**
+
+- `step` - Current step
+- `payloadValue` - Injected payload
+- `page` - Current page state
+
+### onRunEnd
+
+Called when test execution completes. Can modify the result.
+
+```typescript
+onRunEnd?: (result: RunResult, ctx: RunContext) => Promise<RunResult>;
+```
+
+## Browser Event Hooks
+
+### onDialog
+
+Called when a dialog (alert/confirm/prompt) appears.
+
+```typescript
+onDialog?: (dialog: Dialog, ctx: DetectContext) => Promise<Finding | null>;
+```
+
+**Dialog properties:**
+
+- `type()` - "alert" | "confirm" | "prompt" | "beforeunload"
+- `message()` - Dialog message
+
+**Example:**
+
+```typescript
+onDialog: async (dialog, ctx) => {
+  if (dialog.type() === "alert") {
+    return {
+      type: "xss",
+      severity: "high",
+      title: "XSS: alert() triggered",
+      payload: ctx.payloadValue,
+      // ...
+    };
+  }
+  return null;
+};
+```
+
+### onConsoleMessage
+
+Called when console.log/warn/error is called.
+
+```typescript
+onConsoleMessage?: (msg: ConsoleMessage, ctx: DetectContext) => Promise<Finding | null>;
+```
+
+**Message properties:**
+
+- `text()` - Message text
+- `type()` - "log" | "warn" | "error" | etc.
+
+### onPageLoad
+
+Called when a page finishes loading.
+
+```typescript
+onPageLoad?: (page: Page, ctx: DetectContext) => Promise<Finding[]>;
+```
+
+## Context Types
+
+### PluginContext
+
+Base context available to all hooks:
+
+```typescript
+interface PluginContext {
+  config: Record<string, unknown>; // Plugin config
+  engine: EngineInfo; // Engine version info
+  payloads: RuntimePayload[]; // Available payloads
+  findings: Finding[]; // Collected findings
+  logger: PluginLogger; // Scoped logger
+  fetch: typeof fetch; // Fetch API
+}
+```
+
+### RecordContext
+
+Extended context for recording hooks:
+
+```typescript
+interface RecordContext extends PluginContext {
+  startUrl: string;
+  browser: BrowserType;
+  page: Page;
+}
+```
+
+### RunContext
+
+Extended context for running hooks:
+
+```typescript
+interface RunContext extends PluginContext {
+  session: Session;
+  page: Page;
+  browser: BrowserType;
+  headless: boolean;
+}
+```
+
+### DetectContext
+
+Extended context for detection hooks:
+
+```typescript
+interface DetectContext extends RunContext {
+  step: Step; // Current step
+  payloadSet: RuntimePayload;
+  payloadValue: string; // Actual payload
+  stepId: string; // Step identifier
+}
+```

@@ -1,0 +1,161 @@
+---
+title: "vulcn payloads"
+description: "List available payload sets"
+---
+
+## Usage
+
+```bash
+vulcn payloads [options]
+```
+
+## Options
+
+| Option                      | Description                                |
+| --------------------------- | ------------------------------------------ |
+| `-c, --category <category>` | Filter by category (xss, sqli, ssrf, etc.) |
+| `-f, --file <file>`         | Also show payloads from custom file        |
+
+## Description
+
+The `payloads` command lists all available built-in payload sets. Use this to discover what payloads are available for security testing.
+
+## Examples
+
+### List All Payloads
+
+```bash
+vulcn payloads
+```
+
+Output:
+
+```bash
+📦 Available Payloads
+
+XSS
+  xss-basic        Basic XSS payloads (15 payloads)
+  xss-event        Event handler XSS (12 payloads)
+  xss-svg          SVG-based XSS (8 payloads)
+  xss-polyglot     Polyglot XSS payloads (5 payloads)
+
+SQL Injection
+  sqli-basic       Basic SQLi payloads (10 payloads)
+  sqli-error       Error-based SQLi (8 payloads)
+  sqli-blind       Blind SQLi payloads (6 payloads)
+  sqli-union       UNION-based SQLi (5 payloads)
+
+Other
+  ssrf-basic       SSRF payloads (5 payloads)
+  xxe-basic        XXE payloads (4 payloads)
+  cmd-basic        Command injection (6 payloads)
+  path-traversal   Path traversal (8 payloads)
+  open-redirect    Open redirect (4 payloads)
+
+Total: 13 payload sets, 91 payloads
+```
+
+### Filter by Category
+
+```bash
+vulcn payloads --category xss
+```
+
+### Include Custom File
+
+```bash
+vulcn payloads --file ./my-payloads.yml
+```
+
+## Built-in Payload Sets
+
+### XSS Payloads
+
+| Name           | Description                                            | Count |
+| -------------- | ------------------------------------------------------ | ----- |
+| `xss-basic`    | Basic XSS payloads with script tags and event handlers | 15    |
+| `xss-event`    | Event handler payloads (onerror, onclick, etc.)        | 12    |
+| `xss-svg`      | SVG-based XSS payloads                                 | 8     |
+| `xss-polyglot` | Polyglot payloads that work in multiple contexts       | 5     |
+
+### SQL Injection Payloads
+
+| Name         | Description                      | Count |
+| ------------ | -------------------------------- | ----- |
+| `sqli-basic` | Basic SQL injection payloads     | 10    |
+| `sqli-error` | Error-based SQL injection        | 8     |
+| `sqli-blind` | Blind SQL injection (time-based) | 6     |
+| `sqli-union` | UNION-based SQL injection        | 5     |
+
+### Other Payloads
+
+| Name             | Description                          | Count |
+| ---------------- | ------------------------------------ | ----- |
+| `ssrf-basic`     | Server-Side Request Forgery payloads | 5     |
+| `xxe-basic`      | XML External Entity payloads         | 4     |
+| `cmd-basic`      | Command injection payloads           | 6     |
+| `path-traversal` | Directory traversal payloads         | 8     |
+| `open-redirect`  | Open redirect payloads               | 4     |
+
+## PayloadsAllTheThings
+
+Vulcn can fetch payloads from [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings), a comprehensive collection of security payloads.
+
+```bash
+vulcn run session.vulcn.yml --payload payloadbox:xss
+```
+
+Available PayloadBox types:
+
+| Type                | Description                |
+| ------------------- | -------------------------- |
+| `xss`               | XSS payloads               |
+| `sql-injection`     | SQL injection payloads     |
+| `xxe`               | XXE payloads               |
+| `command-injection` | Command injection payloads |
+| `open-redirect`     | Open redirect payloads     |
+| `path-traversal`    | Path traversal payloads    |
+
+## Custom Payloads
+
+Create your own payload file:
+
+```yaml
+# my-payloads.yml
+version: "1"
+payloads:
+  - name: my-xss-payloads
+    category: xss
+    description: Custom XSS payloads for my application
+    payloads:
+      - "<script>alert(document.domain)</script>"
+      - "<img src=x onerror=alert(1)>"
+      - "javascript:alert(1)"
+    detectPatterns:
+      - "alert\\("
+
+  - name: my-sqli-payloads
+    category: sqli
+    description: Custom SQLi payloads
+    payloads:
+      - "' OR '1'='1"
+      - "1; DROP TABLE users--"
+      - "1 UNION SELECT * FROM users"
+```
+
+Use with `--payload-file`:
+
+```bash
+vulcn run session.vulcn.yml --payload-file ./my-payloads.yml
+```
+
+Or configure in `vulcn.config.yml`:
+
+```yaml
+plugins:
+  - name: "@vulcn/plugin-payloads"
+    config:
+      builtin: true
+      files:
+        - ./my-payloads.yml
+```

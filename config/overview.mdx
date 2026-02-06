@@ -58,6 +58,12 @@ plugins:
       bodySeverity: low
       scriptSeverity: medium
 
+  # Report generation
+  - name: "@vulcn/plugin-report"
+    config:
+      format: html
+      outputDir: ./reports
+
 settings:
   browser: chromium
   headless: true

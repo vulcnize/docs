@@ -107,7 +107,7 @@ Execution-based XSS detection:
 
 ### @vulcn/plugin-detect-reflection
 
-Pattern-based reflection detection:
+Input reflection and output encoding detection:
 
 ```yaml
 - name: "@vulcn/plugin-detect-reflection"
@@ -142,6 +142,31 @@ Pattern-based reflection detection:
 | `scriptSeverity`    | string  | `"medium"` | Severity for script reflection      |
 | `attributeSeverity` | string  | `"medium"` | Severity for attribute reflection   |
 
+### @vulcn/plugin-report
+
+Security report generation (HTML, JSON, YAML):
+
+```yaml
+- name: "@vulcn/plugin-report"
+  config:
+    # Output format: html, json, yaml, all
+    format: html
+
+    # Directory to write reports
+    outputDir: ./reports
+```
+
+| Option      | Type   | Default | Description                                  |
+| ----------- | ------ | ------- | -------------------------------------------- |
+| `format`    | string | `html`  | Report format: `html`, `json`, `yaml`, `all` |
+| `outputDir` | string | `.`     | Output directory for report files            |
+
+<Tip>
+  The `--report` and `--report-output` CLI flags override the config file
+  settings. See the [Report Plugin docs](/plugins/plugin-report) for full
+  details.
+</Tip>
+
 ## Disabling Plugins
 
 Temporarily disable a plugin without removing it:
@@ -166,8 +191,9 @@ Plugins are loaded in the order they appear in the config file. This affects:
 1. Payload loading (first payload plugin provides payloads first)
 2. Hook execution (hooks run in plugin order)
 3. Finding collection (findings accumulated in order)
+4. Report generation (report plugin uses `onRunEnd` to receive final results)
 
 <Tip>
   Keep detection plugins after the payloads plugin so payloads are loaded before
-  detection begins.
+  detection begins. Place the report plugin last so it can access all findings.
 </Tip>

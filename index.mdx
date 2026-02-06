@@ -1,17 +1,21 @@
 ---
 title: "Introduction"
-description: "Record once, test everywhere. Driver-based security testing with extensible plugins."
+seo:
+  title: "Vulcn — Modern, Fast Penetration Testing Framework"
+  description: "Record browser interactions once, replay with security payloads, and detect vulnerabilities like XSS and SQLi automatically. A lightweight, pluggable alternative to legacy security scanners."
+description: "Modern, fast penetration testing framework. Record once, replay with payloads, detect vulnerabilities automatically."
 ---
 
 <img src="/images/hero-section.png" alt="Vulcn Hero" />
 
 ## What is Vulcn?
 
-Vulcn is a **driver-based security testing framework** that makes it easy to find vulnerabilities in applications. Instead of manually testing each input with different payloads, Vulcn lets you:
+Vulcn is a **modern, fast penetration testing framework** designed for developers and security engineers who want to find vulnerabilities without the complexity of legacy tools. Instead of manually testing each input, Vulcn lets you:
 
-1. **Record** interactions once (browser clicks, API requests, CLI commands)
-2. **Replay** sessions with security payloads injected into inputs
-3. **Detect** vulnerabilities via plugins (XSS, SQLi, reflection, etc.)
+1. **Record** interactions once (browser clicks, form submissions, navigation)
+2. **Replay** sessions with security payloads injected into every input
+3. **Detect** real vulnerabilities via execution-based detection (not just pattern matching)
+4. **Report** findings with branded HTML dashboards, JSON for CI/CD, or YAML
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
@@ -24,13 +28,30 @@ Vulcn is a **driver-based security testing framework** that makes it easy to fin
     Browser, API, and CLI recording
   </Card>
   <Card title="Plugins" icon="plug" href="/plugins/overview">
-    Extend Vulcn with detection plugins
+    Detection, payloads, and reporting plugins
+  </Card>
+</CardGroup>
+
+## Why Vulcn?
+
+<CardGroup cols={3}>
+  <Card title="⚡ Fast" icon="bolt">
+    Lightweight CLI that starts in milliseconds. No JVM, no desktop app, no
+    proxy setup—just `npm install -g vulcn` and go.
+  </Card>
+  <Card title="🔌 Pluggable" icon="plug">
+    Modular driver and plugin architecture. Add detection, payloads, and
+    reporting as you need them. Nothing bloated, nothing monolithic.
+  </Card>
+  <Card title="🎯 Accurate" icon="bullseye">
+    Execution-based detection verifies real JavaScript execution—when `alert()`
+    fires, you know the XSS is confirmed, not just a guess.
   </Card>
 </CardGroup>
 
 ## Architecture
 
-Vulcn v0.3.0 introduces a modular architecture with **drivers** for different targets and **plugins** for detection:
+Vulcn v0.3.0 uses a modular architecture with **drivers** for different targets and **plugins** for detection and reporting:
 
 ```mermaid
 flowchart TB
@@ -54,6 +75,7 @@ flowchart TB
         Payloads["plugin-payloads"]
         XSS["plugin-detect-xss"]
         Reflect["plugin-detect-reflection"]
+        Report["plugin-report"]
     end
 
     Record --> DM
@@ -65,6 +87,7 @@ flowchart TB
     PM --> Payloads
     PM --> XSS
     PM --> Reflect
+    PM --> Report
 ```
 
 ## Key Features
@@ -83,19 +106,37 @@ flowchart TB
 
 <Accordion title="💉 Payload Injection" icon="syringe">
   Automatically injects security payloads into injectable fields during replay.
-  Built-in payloads cover XSS, SQLi, SSRF, XXE, and more. ```bash vulcn run
-  session.vulcn.yml --payload xss-basic sqli-basic ```
+  Built-in payloads cover XSS, SQLi, SSRF, XXE, and more. Supports PayloadBox
+  integration for thousands of community payloads. ```bash vulcn run
+  session.vulcn.yml --payload xss-basic sqli-basic # Use PayloadBox community
+  payloads vulcn run session.vulcn.yml --payload payloadbox:xss ```
 </Accordion>
 
 <Accordion title="🔌 Plugin System" icon="plug">
   Extend Vulcn with plugins for custom detection, payload loading, and
   reporting. Hook-based architecture for easy customization. ```yaml #
   vulcn.config.yml plugins: - name: "@vulcn/plugin-detect-xss" - name:
-  "@vulcn/plugin-detect-reflection" ```
+  "@vulcn/plugin-detect-reflection" - name: "@vulcn/plugin-report" ```
 </Accordion>
 
-  <Accordion title="🎯 Execution-Based Detection" icon="bullseye">
-    Unlike pattern-matching tools, Vulcn detects **actual JavaScript execution**—when `alert()` fires, you know the XSS is real.
+<Accordion title="🎯 Execution-Based Detection" icon="bullseye">
+  Unlike pattern-matching tools, Vulcn detects **actual JavaScript
+  execution**—when `alert()` fires, you know the XSS is real. No false positives
+  from reflected strings that never execute.
+</Accordion>
+
+  <Accordion title="📊 Security Reports" icon="chart-bar">
+    Generate professional security reports in multiple formats. HTML reports feature a modern dark-themed dashboard with risk gauges and severity breakdowns. JSON output integrates directly into CI/CD pipelines.
+    ```bash
+    # Generate HTML report (auto-opens in browser)
+    vulcn run session.vulcn.yml --report html
+    
+    # Generate JSON for CI/CD
+    vulcn run session.vulcn.yml --report json
+    
+    # Generate all formats
+    vulcn run session.vulcn.yml --report all
+    ```
   </Accordion>
 </AccordionGroup>
 
@@ -107,16 +148,16 @@ flowchart TB
     captures every action as a replayable session.
   </Step>
   <Step title="Choose Payloads">
-    Select from built-in payloads (XSS, SQLi, etc.) or load custom ones from
-    files or PayloadsAllTheThings.
+    Select from built-in payloads (XSS, SQLi, etc.), use PayloadBox community
+    payloads, or load custom ones from files.
   </Step>
   <Step title="Run Tests">
     Vulcn replays your session, injecting each payload into every input field
-    and monitoring for vulnerabilities.
+    and monitoring for vulnerabilities via execution-based detection.
   </Step>
-  <Step title="Review Findings">
-    Get detailed reports of confirmed vulnerabilities with evidence, payloads,
-    and affected URLs.
+  <Step title="Review Reports">
+    Get detailed HTML dashboards, JSON for CI/CD pipelines, or YAML reports—with
+    risk scores, severity breakdowns, and evidence for every finding.
   </Step>
 </Steps>
 
@@ -139,8 +180,8 @@ yarn global add vulcn
 </CodeGroup>
 
 <Note>
-  Vulcn uses Playwright for browser automation. System Chrome/Edge is used by
-  default. Run `vulcn doctor` to check browser availability.
+  Vulcn uses Playwright for browser automation. Browsers are installed
+  automatically on first use. Run `vulcn doctor` to check your setup.
 </Note>
 
 ## Quick Example
@@ -155,20 +196,24 @@ vulcn record https://vulnerable-app.com --output session.vulcn.yml
 # Run security tests
 vulcn run session.vulcn.yml
 
+# Run with PayloadBox payloads and generate a report
+vulcn run session.vulcn.yml --payload payloadbox:xss --report html
+
 # List available payloads
 vulcn payloads
 ```
 
 ## Packages
 
-| Package                           | Description                              |
-| --------------------------------- | ---------------------------------------- |
-| `vulcn`                           | CLI tool                                 |
-| `@vulcn/engine`                   | Core engine with driver & plugin systems |
-| `@vulcn/driver-browser`           | Browser recording with Playwright        |
-| `@vulcn/plugin-payloads`          | XSS, SQLi, SSRF payloads                 |
-| `@vulcn/plugin-detect-xss`        | Execution-based XSS detection            |
-| `@vulcn/plugin-detect-reflection` | Pattern-based reflection detection       |
+| Package                           | Description                                     |
+| --------------------------------- | ----------------------------------------------- |
+| `vulcn`                           | CLI tool — record, run, and manage plugins      |
+| `@vulcn/engine`                   | Core engine with driver & plugin systems        |
+| `@vulcn/driver-browser`           | Playwright-based browser recording & replay     |
+| `@vulcn/plugin-payloads`          | XSS, SQLi, SSRF payloads + PayloadBox support   |
+| `@vulcn/plugin-detect-xss`        | Execution-based XSS detection                   |
+| `@vulcn/plugin-detect-reflection` | Input reflection & output encoding detection    |
+| `@vulcn/plugin-report`            | HTML, JSON, and YAML security report generation |
 
 <Card title="Ready to start?" icon="rocket" href="/quickstart">
   Follow our quickstart guide to find your first vulnerability

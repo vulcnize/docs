@@ -1,5 +1,8 @@
 ---
 title: "Plugin Hooks"
+seo:
+  title: "Vulcn Plugin Hooks — Lifecycle Events for Security Testing Plugins"
+  description: "Complete reference for all Vulcn plugin hooks: initialization, recording, running, browser events, and report generation."
 description: "Available hooks for Vulcn plugins"
 ---
 
@@ -146,11 +149,41 @@ onAfterPayload?: (ctx: DetectContext) => Promise<Finding[]>;
 
 ### onRunEnd
 
-Called when test execution completes. Can modify the result.
+Called when test execution completes. Can modify the result. This is the primary hook used by reporter plugins.
 
 ```typescript
 onRunEnd?: (result: RunResult, ctx: RunContext) => Promise<RunResult>;
 ```
+
+**Use cases:**
+
+- Generate security reports (HTML, JSON, YAML)
+- Send results to external services (Slack, Jira, SIEM)
+- Aggregate or transform findings
+- Calculate risk scores
+
+**Example — Report generation:**
+
+```typescript
+onRunEnd: async (result, ctx) => {
+  const html = generateHtml({
+    session: ctx.session,
+    result,
+    generatedAt: new Date().toISOString(),
+    engineVersion: ctx.engine.version,
+  });
+
+  await writeFile("vulcn-report.html", html);
+  ctx.logger.info("Report saved to vulcn-report.html");
+
+  return result; // Pass through unmodified
+};
+```
+
+<Tip>
+  The built-in `@vulcn/plugin-report` uses this hook. See the [Report Plugin
+  docs](/plugins/plugin-report) for details.
+</Tip>
 
 ## Browser Event Hooks
 

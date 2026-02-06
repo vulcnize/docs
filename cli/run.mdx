@@ -1,6 +1,9 @@
 ---
 title: "vulcn run"
-description: "Run security tests on a recorded session"
+seo:
+  title: "vulcn run — Execute Security Tests with Payload Injection"
+  description: "Run automated penetration tests on recorded sessions. Inject XSS, SQLi, and other security payloads into every input field and generate detailed security reports."
+description: "Run security tests on a recorded session with payload injection and report generation"
 ---
 
 ## Usage
@@ -17,17 +20,19 @@ vulcn run <session> [options]
 
 ## Options
 
-| Option                      | Description                                   | Default     |
-| --------------------------- | --------------------------------------------- | ----------- |
-| `-p, --payload <names...>`  | Payloads to use (e.g., xss-basic, sqli-basic) | `xss-basic` |
-| `-f, --payload-file <file>` | Load custom payloads from YAML/JSON file      | -           |
-| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)    | `chromium`  |
-| `--headless`                | Run in headless mode                          | `true`      |
-| `--no-headless`             | Run with visible browser                      | -           |
+| Option                      | Description                                    | Default     |
+| --------------------------- | ---------------------------------------------- | ----------- |
+| `-p, --payload <names...>`  | Payloads to use (e.g., xss-basic, sqli-basic)  | `xss-basic` |
+| `-f, --payload-file <file>` | Load custom payloads from YAML/JSON file       | -           |
+| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)     | `chromium`  |
+| `--headless`                | Run in headless mode                           | `true`      |
+| `--no-headless`             | Run with visible browser                       | -           |
+| `-r, --report <format>`     | Generate report: `html`, `json`, `yaml`, `all` | -           |
+| `--report-output <dir>`     | Output directory for reports                   | `.`         |
 
 ## Description
 
-The `run` command replays a recorded session while injecting security payloads into every input field. It uses the configured detection plugins to identify vulnerabilities.
+The `run` command replays a recorded session while injecting security payloads into every input field. It uses configured detection plugins to identify vulnerabilities and can generate detailed security reports.
 
 ## Examples
 
@@ -45,7 +50,7 @@ Runs with `xss-basic` payloads and the default `@vulcn/plugin-detect-xss` detect
 vulcn run session.vulcn.yml --payload xss-basic sqli-basic ssrf-basic
 ```
 
-### Use PayloadsAllTheThings
+### Use PayloadBox Community Payloads
 
 ```bash
 vulcn run session.vulcn.yml --payload payloadbox:xss payloadbox:sql-injection
@@ -84,6 +89,39 @@ Watch the browser as tests run. Useful for debugging.
 ```bash
 vulcn run session.vulcn.yml --browser firefox
 ```
+
+## Generating Reports
+
+Generate security reports alongside your test run:
+
+### HTML Report
+
+```bash
+vulcn run session.vulcn.yml --report html
+```
+
+Generates a modern, dark-themed HTML dashboard with risk gauges, severity breakdowns, and expandable finding cards. The report automatically opens in your browser.
+
+### JSON Report (for CI/CD)
+
+```bash
+vulcn run session.vulcn.yml --report json
+```
+
+Produces a machine-readable JSON file for pipeline integration, SIEM ingestion, or custom tooling.
+
+### All Formats
+
+```bash
+vulcn run session.vulcn.yml --report all --report-output ./reports
+```
+
+Generates HTML, JSON, and YAML reports in the specified output directory.
+
+<Tip>
+  Combine reports with PayloadBox payloads for comprehensive scans: ```bash
+  vulcn run session.vulcn.yml --payload payloadbox:xss --report html ```
+</Tip>
 
 ## Output
 
@@ -138,7 +176,7 @@ When vulnerabilities are detected:
 
 <Tip>
   Use the exit code in CI/CD pipelines to fail builds when vulnerabilities are
-  detected: ```bash vulcn run session.vulcn.yml || exit 1 ```
+  detected: ```bash vulcn run session.vulcn.yml --report json || exit 1 ```
 </Tip>
 
 ## Detection Plugins
@@ -154,4 +192,4 @@ For more detection capabilities, add additional plugins:
 vulcn plugin add @vulcn/plugin-detect-reflection
 ```
 
-See [Plugins](/plugins/overview) for more information.
+See [Plugins](/plugins/overview) for more information, or check out the [Report Plugin](/plugins/plugin-report) for report generation options.

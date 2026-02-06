@@ -59,7 +59,8 @@
             "pages": [
               "plugins/plugin-payloads",
               "plugins/plugin-detect-xss",
-              "plugins/plugin-detect-reflection"
+              "plugins/plugin-detect-reflection",
+              "plugins/plugin-report"
             ]
           },
           {

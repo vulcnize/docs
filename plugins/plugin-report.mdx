@@ -1,0 +1,235 @@
+---
+title: "@vulcn/plugin-report"
+description: "Generate modern HTML dashboards, machine-readable JSON, and YAML security reports from penetration test results"
+---
+
+## Overview
+
+The report plugin generates branded, professional security reports at the end of each `vulcn run`. It supports three output formats and integrates seamlessly with CI/CD pipelines.
+
+<CardGroup cols={3}>
+  <Card title="HTML" icon="file-code">
+    Modern dark-themed dashboard with risk gauge, severity breakdown, and
+    expandable finding cards
+  </Card>
+  <Card title="JSON" icon="braces">
+    Machine-readable structured output for CI/CD pipelines, SIEM integration,
+    and custom tooling
+  </Card>
+  <Card title="YAML" icon="file-lines">
+    Human-readable YAML with descriptive headers — same data model as JSON
+  </Card>
+</CardGroup>
+
+## Installation
+
+The report plugin is bundled with the `vulcn` CLI. No additional installation needed.
+
+For programmatic use:
+
+<CodeGroup>
+
+```bash npm
+npm install @vulcn/plugin-report
+```
+
+```bash pnpm
+pnpm add @vulcn/plugin-report
+```
+
+</CodeGroup>
+
+## CLI Usage
+
+### Generate an HTML Report
+
+```bash
+vulcn run session.vulcn.yml --report html
+```
+
+The HTML report is saved to the current directory and automatically opens in your browser.
+
+### Generate JSON for CI/CD
+
+```bash
+vulcn run session.vulcn.yml --report json
+```
+
+### Generate All Formats
+
+```bash
+vulcn run session.vulcn.yml --report all
+```
+
+### Custom Output Directory
+
+```bash
+vulcn run session.vulcn.yml --report html --report-output ./reports
+```
+
+## CLI Options
+
+| Option                  | Description                                  | Default |
+| ----------------------- | -------------------------------------------- | ------- |
+| `-r, --report <format>` | Report format: `html`, `json`, `yaml`, `all` | -       |
+| `--report-output <dir>` | Output directory for generated reports       | `.`     |
+
+## Configuration
+
+### Via `vulcn.config.yml`
+
+```yaml
+plugins:
+  - name: "@vulcn/plugin-report"
+    config:
+      format: html
+      outputDir: ./reports
+```
+
+### Config Options
+
+| Option      | Type     | Default | Description                                  |
+| ----------- | -------- | ------- | -------------------------------------------- |
+| `format`    | `string` | `html`  | Output format: `html`, `json`, `yaml`, `all` |
+| `outputDir` | `string` | `.`     | Directory to write report files              |
+
+## HTML Report Features
+
+The HTML report is designed as a modern security dashboard:
+
+- **🛡️ Vulcn Branding** — Shield logo with gradient header
+- **📊 Risk Gauge** — Circular SVG gauge showing overall risk score (0–100)
+- **📈 Severity Breakdown** — Color-coded bars for Critical, High, Medium, Low, Info
+- **📋 Execution Summary** — Findings count, payloads tested, steps executed, URLs affected
+- **🃏 Expandable Findings** — Click to reveal description, payload (syntax-highlighted), evidence, and metadata
+- **⚠️ Errors Section** — Execution errors and timeouts
+- **🖨️ Print-Friendly** — All details auto-expand for PDF export (Cmd+P / Ctrl+P)
+- **🌙 Dark Theme** — Ambient gradient background with Inter + JetBrains Mono typography
+
+## JSON Output Schema
+
+```json
+{
+  "vulcn": {
+    "version": "0.3.0",
+    "generatedAt": "2026-02-07T03:53:00Z"
+  },
+  "session": {
+    "name": "Login Flow Test",
+    "driver": "browser",
+    "targetUrl": "https://example.com",
+    "stepsCount": 6
+  },
+  "summary": {
+    "riskScore": 75,
+    "riskLevel": "high",
+    "totalFindings": 4,
+    "severityCounts": {
+      "critical": 1,
+      "high": 2,
+      "medium": 1,
+      "low": 0,
+      "info": 0
+    },
+    "uniqueVulnTypes": ["xss", "reflection"],
+    "affectedUrls": ["https://example.com/search"]
+  },
+  "execution": {
+    "stepsExecuted": 6,
+    "payloadsTested": 42,
+    "duration": 15230,
+    "durationFormatted": "15.2s",
+    "errors": []
+  },
+  "findings": [
+    {
+      "type": "xss",
+      "severity": "critical",
+      "title": "XSS Confirmed: alert() executed",
+      "description": "JavaScript alert() dialog was triggered",
+      "stepId": "step_005",
+      "payload": "<script>alert('XSS')</script>",
+      "url": "https://example.com/search",
+      "evidence": "Dialog type: alert",
+      "metadata": {
+        "detectionMethod": "dialog"
+      }
+    }
+  ]
+}
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+- name: Run security tests
+  run: vulcn run session.vulcn.yml --report json --report-output ./reports
+
+- name: Upload report
+  uses: actions/upload-artifact@v4
+  with:
+    name: security-report
+    path: ./reports/
+```
+
+### GitLab CI
+
+```yaml
+security_scan:
+  script:
+    - vulcn run session.vulcn.yml --report json --report-output ./reports
+  artifacts:
+    paths:
+      - reports/
+    reports:
+      security: reports/vulcn-report.json
+```
+
+### Exit Codes
+
+| Code | Meaning                  |
+| ---- | ------------------------ |
+| `0`  | No vulnerabilities found |
+| `1`  | Vulnerabilities detected |
+
+Use the exit code to gate deployments:
+
+```bash
+vulcn run session.vulcn.yml --report all || exit 1
+```
+
+## Programmatic Usage
+
+```typescript
+import { generateHtml, generateJson, generateYaml } from "@vulcn/plugin-report";
+
+const reportData = {
+  session,
+  result,
+  generatedAt: new Date().toISOString(),
+  engineVersion: "0.3.0",
+};
+
+// Generate HTML string
+const html = generateHtml(reportData);
+
+// Generate JSON string
+const json = generateJson(reportData);
+
+// Generate YAML string
+const yaml = generateYaml(reportData);
+```
+
+## Output Files
+
+| Format | Filename            | Content Type       |
+| ------ | ------------------- | ------------------ |
+| HTML   | `vulcn-report.html` | `text/html`        |
+| JSON   | `vulcn-report.json` | `application/json` |
+| YAML   | `vulcn-report.yaml` | `text/yaml`        |
+
+<Card title="Plugin Hooks" icon="code" href="/plugins/hooks">
+  The report plugin uses the `onRunEnd` hook — see all available hooks
+</Card>

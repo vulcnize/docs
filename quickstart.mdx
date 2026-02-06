@@ -1,5 +1,8 @@
 ---
 title: "Quickstart"
+seo:
+  title: "Vulcn Quickstart — Find Your First Vulnerability in 5 Minutes"
+  description: "Step-by-step guide to recording browser sessions, running automated penetration tests with XSS and SQLi payloads, and generating security reports with Vulcn."
 description: "Find your first vulnerability in under 5 minutes"
 ---
 
@@ -195,6 +198,24 @@ If vulnerabilities are found, you'll see output like:
 ```
 
 </Step>
+
+<Step title="Generate a report">
+
+Generate a professional HTML security report:
+
+```bash
+vulcn run session.vulcn.yml --report html
+```
+
+This creates a `vulcn-report.html` file and opens it in your browser. The report includes a risk gauge, severity breakdown, and detailed finding cards with payloads and evidence.
+
+For CI/CD pipelines, use JSON:
+
+```bash
+vulcn run session.vulcn.yml --report json --report-output ./reports
+```
+
+</Step>
 </Steps>
 
 ## Explore Payloads
@@ -244,7 +265,7 @@ Total: 13 payload sets, 91 payloads
   <Card title="Plugins" icon="plug" href="/plugins/overview">
     Add more detection capabilities with plugins
   </Card>
-  <Card title="Custom Payloads" icon="syringe" href="/plugins/plugin-payloads">
-    Load custom payloads from files
+  <Card title="Reports" icon="chart-bar" href="/plugins/plugin-report">
+    Generate HTML, JSON, and YAML reports
   </Card>
 </CardGroup>

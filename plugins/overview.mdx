@@ -1,5 +1,8 @@
 ---
 title: "Plugin System"
+seo:
+  title: "Vulcn Plugin System — Extend Detection, Payloads, and Reporting"
+  description: "Learn how Vulcn's hook-based plugin system enables custom vulnerability detection, payload loading, and security report generation."
 description: "Extend Vulcn with plugins for detection, payloads, and reporting"
 ---
 
@@ -24,12 +27,12 @@ Vulcn's plugin system allows you to extend its capabilities with custom detectio
 
 ## Plugin Types
 
-| Type             | Purpose                  | Example                      |
-| ---------------- | ------------------------ | ---------------------------- |
-| **Loaders**      | Provide payloads         | `@vulcn/plugin-payloads`     |
-| **Detectors**    | Find vulnerabilities     | `@vulcn/plugin-detect-xss`   |
-| **Reporters**    | Output findings          | `@vulcn/plugin-report-sarif` |
-| **Transformers** | Modify sessions/payloads | Custom preprocessing         |
+| Type             | Purpose                   | Example                    |
+| ---------------- | ------------------------- | -------------------------- |
+| **Loaders**      | Provide payloads          | `@vulcn/plugin-payloads`   |
+| **Detectors**    | Find vulnerabilities      | `@vulcn/plugin-detect-xss` |
+| **Reporters**    | Generate security reports | `@vulcn/plugin-report`     |
+| **Transformers** | Modify sessions/payloads  | Custom preprocessing       |
 
 ## Official Plugins
 
@@ -53,7 +56,14 @@ Vulcn's plugin system allows you to extend its capabilities with custom detectio
     icon="magnifying-glass"
     href="/plugins/plugin-detect-reflection"
   >
-    Pattern-based reflection detection
+    Input reflection & output encoding detection
+  </Card>
+  <Card
+    title="@vulcn/plugin-report"
+    icon="chart-bar"
+    href="/plugins/plugin-report"
+  >
+    HTML, JSON, and YAML security reports
   </Card>
 </CardGroup>
 

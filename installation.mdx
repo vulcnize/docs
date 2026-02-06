@@ -1,6 +1,9 @@
 ---
 title: "Installation"
-description: "Install Vulcn and set up your environment"
+seo:
+  title: "Install Vulcn — Modern Penetration Testing CLI Setup"
+  description: "Install the Vulcn security testing CLI, set up Playwright browsers, and configure plugins for automated penetration testing."
+description: "Install Vulcn and set up your environment for security testing"
 ---
 
 ## System Requirements
@@ -32,7 +35,7 @@ Verify the installation:
 
 ```bash
 vulcn --version
-# Output: 0.2.0
+# Output: 0.3.0
 ```
 
 ## Install Browsers
@@ -63,8 +66,8 @@ Output:
 ```bash
 🔍 Checking Vulcn environment...
 
-✓ Node.js v20.10.0
-✓ Vulcn CLI v0.2.0
+✓ Node.js v22.0.0
+✓ Vulcn CLI v0.3.0
 ✓ Chromium installed
 ✗ Firefox not installed
 ✗ WebKit not installed
@@ -126,18 +129,19 @@ yarn add @vulcn/engine
 Example:
 
 ```typescript
-import { Recorder, Runner, parseSession, PluginManager } from "@vulcn/engine";
+import { DriverManager, PluginManager } from "@vulcn/engine";
 
-// Record a session
-const recording = await Recorder.start("https://example.com");
-// ... user interacts ...
-const session = await recording.stop();
+const drivers = new DriverManager();
+const plugins = new PluginManager();
 
-// Run with payloads
-const result = await Runner.execute(session, {
-  headless: true,
-  onFinding: (finding) => console.log("Found:", finding.title),
-});
+// Load browser driver
+await drivers.load("@vulcn/driver-browser");
+
+// Parse session from YAML
+const session = drivers.parseSession(sessionYaml);
+
+// Execute with plugin detection
+const result = await drivers.execute(session, plugins);
 
 console.log(`Found ${result.findings.length} vulnerabilities`);
 ```
@@ -158,11 +162,14 @@ rm -rf ~/.cache/ms-playwright  # Linux/macOS
 
 ## Next Steps
 
-<CardGroup cols={2}>
+<CardGroup cols={3}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
     Record and run your first security test
   </Card>
   <Card title="CLI Reference" icon="terminal" href="/cli/overview">
     Learn all available commands
+  </Card>
+  <Card title="Reports" icon="chart-bar" href="/plugins/plugin-report">
+    Generate HTML, JSON, and YAML security reports
   </Card>
 </CardGroup>

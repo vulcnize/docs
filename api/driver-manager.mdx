@@ -372,7 +372,7 @@ async function runSecurityTest() {
 
   // Set up plugin manager
   const pluginManager = new PluginManager();
-  pluginManager.addPlugin(payloadsPlugin, { builtin: true });
+  pluginManager.addPlugin(payloadsPlugin, { types: ["xss"] });
   pluginManager.addPlugin(xssPlugin);
   await pluginManager.initialize();
 

@@ -20,19 +20,34 @@ vulcn run <session> [options]
 
 ## Options
 
-| Option                      | Description                                    | Default     |
-| --------------------------- | ---------------------------------------------- | ----------- |
-| `-p, --payload <names...>`  | Payloads to use (e.g., xss-basic, sqli-basic)  | `xss-basic` |
-| `-f, --payload-file <file>` | Load custom payloads from YAML/JSON file       | -           |
-| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)     | `chromium`  |
-| `--headless`                | Run in headless mode                           | `true`      |
-| `--no-headless`             | Run with visible browser                       | -           |
-| `-r, --report <format>`     | Generate report: `html`, `json`, `yaml`, `all` | -           |
-| `--report-output <dir>`     | Output directory for reports                   | `.`         |
+| Option                      | Description                                    | Default    |
+| --------------------------- | ---------------------------------------------- | ---------- |
+| `-p, --payload <names...>`  | Payload types to use (xss, sqli, cmd, etc.)    | `xss`      |
+| `-f, --payload-file <file>` | Load custom payloads from YAML/JSON file       | -          |
+| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)     | `chromium` |
+| `--headless`                | Run in headless mode                           | `true`     |
+| `--no-headless`             | Run with visible browser                       | -          |
+| `-r, --report <format>`     | Generate report: `html`, `json`, `yaml`, `all` | -          |
+| `--report-output <dir>`     | Output directory for reports                   | `.`        |
 
 ## Description
 
 The `run` command replays a recorded session while injecting security payloads into every input field. It uses configured detection plugins to identify vulnerabilities and can generate detailed security reports.
+
+Payloads are fetched from [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) — the largest community-curated collection of security payloads.
+
+## Payload Types
+
+| Short Name  | Full Name           | Description                                     |
+| ----------- | ------------------- | ----------------------------------------------- |
+| `xss`       | `xss`               | Cross-Site Scripting — script injection, events |
+| `sqli`      | `sql-injection`     | SQL Injection — auth bypass, UNION, error-based |
+| `xxe`       | `xxe`               | XML External Entity — file read, SSRF via XML   |
+| `cmd`       | `command-injection` | OS Command Injection — shell execution          |
+| `redirect`  | `open-redirect`     | Open Redirect — URL redirect to attacker domain |
+| `traversal` | `path-traversal`    | Path Traversal — directory traversal            |
+
+Additional aliases: `sql` → `sql-injection`, `command` → `command-injection`, `lfi` → `path-traversal`
 
 ## Examples
 
@@ -42,24 +57,18 @@ The `run` command replays a recorded session while injecting security payloads i
 vulcn run session.vulcn.yml
 ```
 
-Runs with `xss-basic` payloads and the default `@vulcn/plugin-detect-xss` detection.
+Runs with `xss` payloads and the default `@vulcn/plugin-detect-xss` detection.
 
-### Multiple Payload Sets
-
-```bash
-vulcn run session.vulcn.yml --payload xss-basic sqli-basic ssrf-basic
-```
-
-### Use PayloadBox Community Payloads
+### Multiple Payload Types
 
 ```bash
-vulcn run session.vulcn.yml --payload payloadbox:xss payloadbox:sql-injection
+vulcn run session.vulcn.yml -p xss sqli cmd
 ```
 
 ### Custom Payload File
 
 ```bash
-vulcn run session.vulcn.yml --payload-file ./my-payloads.yml
+vulcn run session.vulcn.yml -f ./my-payloads.yml
 ```
 
 Custom payload file format:
@@ -119,8 +128,8 @@ vulcn run session.vulcn.yml --report all --report-output ./reports
 Generates HTML, JSON, and YAML reports in the specified output directory.
 
 <Tip>
-  Combine reports with PayloadBox payloads for comprehensive scans: ```bash
-  vulcn run session.vulcn.yml --payload payloadbox:xss --report html ```
+  Combine reports with multiple payload types for comprehensive scans: ```bash
+  vulcn run session.vulcn.yml -p xss sqli -r html ```
 </Tip>
 
 ## Output
@@ -132,8 +141,7 @@ When vulnerabilities are detected:
 ```bash
 🔍 Running security tests
    Session: Login Flow Test
-   Payloads: xss-basic, sqli-basic
-   Payload count: 25
+   Payloads: xss, sqli
    Browser: chromium
    Headless: true
 
@@ -181,10 +189,10 @@ When vulnerabilities are detected:
 
 ## Detection Plugins
 
-The `run` command automatically loads the `@vulcn/plugin-detect-xss` plugin if not already configured. This plugin detects XSS by monitoring:
+The `run` command automatically loads detection plugins based on the payload types used:
 
-- **`alert()`, `confirm()`, `prompt()`** dialogs
-- **Console markers** (`console.log('VULCN_XSS:...')`)
+- **`@vulcn/plugin-detect-xss`** — Always loaded. Detects XSS by monitoring dialogs and console markers.
+- **`@vulcn/plugin-detect-sqli`** — Auto-loaded when `sqli` payloads are used. Detects SQL injection via error patterns, timing, and response diffing.
 
 For more detection capabilities, add additional plugins:
 

@@ -10,8 +10,6 @@ Plugins are configured in the `plugins` array:
 ```yaml
 plugins:
   - name: "@vulcn/plugin-payloads"
-    config:
-      builtin: true
     enabled: true
 
   - name: "@vulcn/plugin-detect-xss"
@@ -36,22 +34,13 @@ Handles all payload loading:
 ```yaml
 - name: "@vulcn/plugin-payloads"
   config:
-    # Include built-in payloads
-    builtin: true
-
-    # Only include specific payload sets
-    include:
-      - xss-basic
-      - sqli-basic
-
-    # Exclude specific payload sets
-    exclude:
-      - xss-polyglot
-
-    # Fetch from PayloadsAllTheThings
-    payloadbox:
+    # Payload types to load
+    types:
       - xss
-      - sql-injection
+      - sqli
+
+    # Maximum payloads per type
+    limit: 50
 
     # Load custom payload files
     files:
@@ -59,13 +48,11 @@ Handles all payload loading:
       - ./enterprise-payloads.json
 ```
 
-| Option       | Type     | Default | Description                     |
-| ------------ | -------- | ------- | ------------------------------- |
-| `builtin`    | boolean  | `true`  | Include built-in payloads       |
-| `include`    | string[] | -       | Only include these payload sets |
-| `exclude`    | string[] | -       | Exclude these payload sets      |
-| `payloadbox` | string[] | -       | Fetch from PayloadsAllTheThings |
-| `files`      | string[] | -       | Custom payload file paths       |
+| Option  | Type     | Default | Description                                   |
+| ------- | -------- | ------- | --------------------------------------------- |
+| `types` | string[] | -       | Payload types to load (accepts short aliases) |
+| `limit` | number   | `50`    | Maximum payloads per type                     |
+| `files` | string[] | -       | Custom payload file paths                     |
 
 ### @vulcn/plugin-detect-xss
 
@@ -104,6 +91,37 @@ Execution-based XSS detection:
 | `detectDomMutation` | boolean  | `false`             | Check for injected scripts   |
 | `alertPatterns`     | string[] | `["XSS", "1", ...]` | Patterns to match in alerts  |
 | `severity`          | string   | `"high"`            | Finding severity level       |
+
+### @vulcn/plugin-detect-sqli
+
+SQL injection detection via error patterns, timing, and response diffing:
+
+```yaml
+- name: "@vulcn/plugin-detect-sqli"
+  config:
+    detectErrors: true
+    detectDiff: true
+    detectTiming: true
+    timingThresholdMs: 4000
+    errorSeverity: high
+    timingSeverity: high
+    diffSeverity: medium
+```
+
+| Option              | Type    | Default    | Description                            |
+| ------------------- | ------- | ---------- | -------------------------------------- |
+| `detectErrors`      | boolean | `true`     | Enable error-based detection           |
+| `detectDiff`        | boolean | `true`     | Enable response body diffing           |
+| `detectTiming`      | boolean | `true`     | Enable timing-based detection          |
+| `timingThresholdMs` | number  | `4000`     | Response time threshold for blind SQLi |
+| `errorSeverity`     | string  | `"high"`   | Severity for error-based findings      |
+| `timingSeverity`    | string  | `"high"`   | Severity for timing-based findings     |
+| `diffSeverity`      | string  | `"medium"` | Severity for diff-based findings       |
+
+<Tip>
+  The `@vulcn/plugin-detect-sqli` is auto-loaded when `sqli` payloads are used.
+  You only need to configure it manually if you want to customize its settings.
+</Tip>
 
 ### @vulcn/plugin-detect-reflection
 

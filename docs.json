@@ -22,6 +22,7 @@
             "pages": [
               "cli/overview",
               "cli/record",
+              "cli/crawl",
               "cli/run",
               "cli/payloads",
               "cli/plugin",
@@ -59,6 +60,7 @@
             "pages": [
               "plugins/plugin-payloads",
               "plugins/plugin-detect-xss",
+              "plugins/plugin-detect-sqli",
               "plugins/plugin-detect-reflection",
               "plugins/plugin-report"
             ]

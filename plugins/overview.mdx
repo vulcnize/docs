@@ -42,7 +42,7 @@ Vulcn's plugin system allows you to extend its capabilities with custom detectio
     icon="syringe"
     href="/plugins/plugin-payloads"
   >
-    Load built-in, PayloadBox, and custom payloads
+    Load payloads from PayloadsAllTheThings and custom files
   </Card>
   <Card
     title="@vulcn/plugin-detect-xss"
@@ -50,6 +50,13 @@ Vulcn's plugin system allows you to extend its capabilities with custom detectio
     href="/plugins/plugin-detect-xss"
   >
     Execution-based XSS detection
+  </Card>
+  <Card
+    title="@vulcn/plugin-detect-sqli"
+    icon="database"
+    href="/plugins/plugin-detect-sqli"
+  >
+    SQL injection detection via error patterns, timing, and response diffing
   </Card>
   <Card
     title="@vulcn/plugin-detect-reflection"
@@ -74,8 +81,6 @@ Plugins are configured in `vulcn.config.yml`:
 ```yaml
 plugins:
   - name: "@vulcn/plugin-payloads"
-    config:
-      builtin: true
 
   - name: "@vulcn/plugin-detect-xss"
     config:
@@ -106,8 +111,9 @@ vulcn plugin disable @vulcn/plugin-detect-xss
 
 When you run `vulcn run` without a config file, the CLI automatically loads:
 
-1. **Payloads**: Loads `xss-basic` built-in payload set
-2. **Detection**: Loads `@vulcn/plugin-detect-xss` for XSS detection
+1. **Payloads**: Fetches `xss` payloads from PayloadsAllTheThings
+2. **XSS Detection**: Loads `@vulcn/plugin-detect-xss`
+3. **SQLi Detection**: Loads `@vulcn/plugin-detect-sqli` when `sqli` payloads are used
 
 This ensures Vulcn is useful out of the box.
 

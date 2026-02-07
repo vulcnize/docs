@@ -1,6 +1,9 @@
 ---
 title: "vulcn payloads"
-description: "List available payload sets"
+seo:
+  title: "vulcn payloads — List Available Security Payload Types"
+  description: "Explore all available payload types for security testing. Payloads are sourced from PayloadsAllTheThings — the largest curated collection of security payloads."
+description: "List available payload types"
 ---
 
 ## Usage
@@ -11,18 +14,18 @@ vulcn payloads [options]
 
 ## Options
 
-| Option                      | Description                                |
-| --------------------------- | ------------------------------------------ |
-| `-c, --category <category>` | Filter by category (xss, sqli, ssrf, etc.) |
-| `-f, --file <file>`         | Also show payloads from custom file        |
+| Option                      | Description                         |
+| --------------------------- | ----------------------------------- |
+| `-c, --category <category>` | Filter by category                  |
+| `-f, --file <file>`         | Also show payloads from custom file |
 
 ## Description
 
-The `payloads` command lists all available built-in payload sets. Use this to discover what payloads are available for security testing.
+The `payloads` command lists all available payload types. Payloads are fetched on demand from [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings), the largest community-curated collection of security payloads.
 
 ## Examples
 
-### List All Payloads
+### List All Payload Types
 
 ```bash
 vulcn payloads
@@ -31,28 +34,29 @@ vulcn payloads
 Output:
 
 ```bash
-📦 Available Payloads
+📦 Available Payload Types
+  Payloads are fetched from PayloadsAllTheThings on demand.
 
-XSS
-  xss-basic        Basic XSS payloads (15 payloads)
-  xss-event        Event handler XSS (12 payloads)
-  xss-svg          SVG-based XSS (8 payloads)
-  xss-polyglot     Polyglot XSS payloads (5 payloads)
+  xss
+    Cross-Site Scripting — script injection, event handlers, SVG payloads
+  sql-injection (sqli, sql)
+    SQL Injection — auth bypass, UNION, error-based, blind
+  xxe
+    XML External Entity — file read, SSRF via XML
+  command-injection (cmd, command)
+    OS Command Injection — shell execution, pipe injection
+  open-redirect (redirect)
+    Open Redirect — URL redirect to attacker domain
+  path-traversal (traversal, lfi)
+    Path Traversal — directory traversal with exotic encodings
 
-SQL Injection
-  sqli-basic       Basic SQLi payloads (10 payloads)
-  sqli-error       Error-based SQLi (8 payloads)
-  sqli-blind       Blind SQLi payloads (6 payloads)
-  sqli-union       UNION-based SQLi (5 payloads)
+──────────────────────────────────────────────────
+6 payload types | Source: PayloadsAllTheThings
 
-Other
-  ssrf-basic       SSRF payloads (5 payloads)
-  xxe-basic        XXE payloads (4 payloads)
-  cmd-basic        Command injection (6 payloads)
-  path-traversal   Path traversal (8 payloads)
-  open-redirect    Open redirect (4 payloads)
-
-Total: 13 payload sets, 91 payloads
+Usage:
+  vulcn run session.yml -p xss sqli
+  vulcn run session.yml -p xss sqli cmd xxe
+  vulcn run session.yml -f custom-payloads.yml
 ```
 
 ### Filter by Category
@@ -67,58 +71,29 @@ vulcn payloads --category xss
 vulcn payloads --file ./my-payloads.yml
 ```
 
-## Built-in Payload Sets
+## Payload Types
 
-### XSS Payloads
+| Type                | Short Aliases      | Description                                     |
+| ------------------- | ------------------ | ----------------------------------------------- |
+| `xss`               | —                  | Cross-Site Scripting — script injection, events |
+| `sql-injection`     | `sqli`, `sql`      | SQL Injection — auth bypass, UNION, error-based |
+| `xxe`               | —                  | XML External Entity — file read, SSRF via XML   |
+| `command-injection` | `cmd`, `command`   | OS Command Injection — shell execution          |
+| `open-redirect`     | `redirect`         | Open Redirect — URL redirect to attacker domain |
+| `path-traversal`    | `traversal`, `lfi` | Path Traversal — directory traversal            |
 
-| Name           | Description                                            | Count |
-| -------------- | ------------------------------------------------------ | ----- |
-| `xss-basic`    | Basic XSS payloads with script tags and event handlers | 15    |
-| `xss-event`    | Event handler payloads (onerror, onclick, etc.)        | 12    |
-| `xss-svg`      | SVG-based XSS payloads                                 | 8     |
-| `xss-polyglot` | Polyglot payloads that work in multiple contexts       | 5     |
-
-### SQL Injection Payloads
-
-| Name         | Description                      | Count |
-| ------------ | -------------------------------- | ----- |
-| `sqli-basic` | Basic SQL injection payloads     | 10    |
-| `sqli-error` | Error-based SQL injection        | 8     |
-| `sqli-blind` | Blind SQL injection (time-based) | 6     |
-| `sqli-union` | UNION-based SQL injection        | 5     |
-
-### Other Payloads
-
-| Name             | Description                          | Count |
-| ---------------- | ------------------------------------ | ----- |
-| `ssrf-basic`     | Server-Side Request Forgery payloads | 5     |
-| `xxe-basic`      | XML External Entity payloads         | 4     |
-| `cmd-basic`      | Command injection payloads           | 6     |
-| `path-traversal` | Directory traversal payloads         | 8     |
-| `open-redirect`  | Open redirect payloads               | 4     |
-
-## PayloadsAllTheThings
-
-Vulcn can fetch payloads from [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings), a comprehensive collection of security payloads.
+Use either the full name or any short alias:
 
 ```bash
-vulcn run session.vulcn.yml --payload payloadbox:xss
+# These are equivalent:
+vulcn run session.yml -p sqli
+vulcn run session.yml -p sql-injection
+vulcn run session.yml -p sql
 ```
-
-Available PayloadBox types:
-
-| Type                | Description                |
-| ------------------- | -------------------------- |
-| `xss`               | XSS payloads               |
-| `sql-injection`     | SQL injection payloads     |
-| `xxe`               | XXE payloads               |
-| `command-injection` | Command injection payloads |
-| `open-redirect`     | Open redirect payloads     |
-| `path-traversal`    | Path traversal payloads    |
 
 ## Custom Payloads
 
-Create your own payload file:
+For security experts who need domain-specific payloads, create a custom payload file:
 
 ```yaml
 # my-payloads.yml
@@ -146,7 +121,7 @@ payloads:
 Use with `--payload-file`:
 
 ```bash
-vulcn run session.vulcn.yml --payload-file ./my-payloads.yml
+vulcn run session.vulcn.yml -f ./my-payloads.yml
 ```
 
 Or configure in `vulcn.config.yml`:
@@ -155,7 +130,6 @@ Or configure in `vulcn.config.yml`:
 plugins:
   - name: "@vulcn/plugin-payloads"
     config:
-      builtin: true
       files:
         - ./my-payloads.yml
 ```

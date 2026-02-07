@@ -171,7 +171,7 @@ async function main() {
   await manager.loadPlugins();
 
   // Option 2: Add plugins programmatically
-  manager.addPlugin(payloadsPlugin, { builtin: true });
+  manager.addPlugin(payloadsPlugin, { types: ["xss"] });
   manager.addPlugin(detectXss, { detectDialogs: true });
 
   // Initialize

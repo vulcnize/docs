@@ -42,7 +42,7 @@ Next steps:
      vulcn run session.vulcn.yml
 
   3. Customize payloads:
-     vulcn run session.vulcn.yml --payload xss-basic sqli-basic
+     vulcn run session.vulcn.yml -p xss sqli
 ```
 
 ### Overwrite Existing
@@ -62,8 +62,6 @@ The generated `vulcn.config.yml`:
 version: "1"
 plugins:
   - name: "@vulcn/plugin-payloads"
-    config:
-      builtin: true
   - name: "@vulcn/plugin-detect-xss"
     config:
       detectDialogs: true
@@ -78,9 +76,7 @@ settings:
 
 ### @vulcn/plugin-payloads
 
-The payloads plugin is configured with:
-
-- **builtin: true** - Enables all 13 built-in payload sets (91 payloads)
+The payloads plugin loads payloads from PayloadsAllTheThings on demand. Default type is `xss`.
 
 ### @vulcn/plugin-detect-xss
 

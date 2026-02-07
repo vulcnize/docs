@@ -183,8 +183,7 @@ async function runTests(sessionPath: string) {
   // Set up plugins
   const manager = new PluginManager();
   manager.addPlugin(payloadsPlugin, {
-    builtin: true,
-    include: ["xss-basic", "sqli-basic"],
+    types: ["xss", "sqli"],
   });
   manager.addPlugin(detectXss, { detectDialogs: true });
   manager.addPlugin(detectReflection, { detectScript: true });

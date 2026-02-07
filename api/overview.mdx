@@ -45,7 +45,7 @@ import detectXss from "@vulcn/plugin-detect-xss";
 driverManager.register(browserDriver);
 
 // Set up plugins
-pluginManager.addPlugin(payloadsPlugin, { builtin: true });
+pluginManager.addPlugin(payloadsPlugin, { types: ["xss"] });
 pluginManager.addPlugin(detectXss, { detectDialogs: true });
 await pluginManager.initialize();
 

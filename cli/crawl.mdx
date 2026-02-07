@@ -1,0 +1,142 @@
+---
+title: "vulcn crawl"
+seo:
+  title: "vulcn crawl — Auto-Discover Forms and Injection Points"
+  description: "Automatically crawl web applications to discover forms and injectable inputs. Generate session files for automated security testing with Vulcn."
+description: "Auto-discover forms and injection points on a target website"
+---
+
+## Usage
+
+```bash
+vulcn crawl <url> [options]
+```
+
+## Arguments
+
+| Argument | Description         | Required |
+| -------- | ------------------- | -------- |
+| `url`    | Target URL to crawl | Yes      |
+
+## Options
+
+| Option                      | Description                                    | Default      |
+| --------------------------- | ---------------------------------------------- | ------------ |
+| `-o, --output <dir>`        | Output directory for session files             | `./sessions` |
+| `-d, --depth <n>`           | Maximum crawl depth                            | `2`          |
+| `-m, --max-pages <n>`       | Maximum pages to visit                         | `20`         |
+| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)     | `chromium`   |
+| `--headless`                | Run in headless mode                           | `true`       |
+| `--no-headless`             | Run with visible browser                       | -            |
+| `-t, --timeout <ms>`        | Page timeout in milliseconds                   | `10000`      |
+| `--no-same-origin`          | Allow following cross-origin links             | -            |
+| `--run-after <payloads...>` | Auto-run scans after crawl with these payloads | -            |
+
+## Description
+
+The `crawl` command automates the discovery of forms and injectable inputs across a web application. It generates one `.vulcn.yml` session file per discovered form, which can then be used with `vulcn run` for security testing.
+
+This is essential for **automated benchmarking** — point it at a target, let it discover attack surfaces, and optionally chain directly into scanning.
+
+## How It Works
+
+1. Visits the target URL and discovers all links
+2. Follows links up to `--depth` levels deep (BFS)
+3. Identifies forms and standalone inputs on each page
+4. Generates a `.vulcn.yml` session file per form with all injectable inputs marked
+5. Optionally chains into `vulcn run` with `--run-after`
+
+## Examples
+
+### Basic Crawl
+
+```bash
+vulcn crawl https://example.com
+```
+
+Crawls the site up to 2 levels deep, saves sessions to `./sessions/`.
+
+### Deep Crawl
+
+```bash
+vulcn crawl https://example.com -d 3 -m 50
+```
+
+Follow links 3 levels deep, visiting up to 50 pages.
+
+### Custom Output Directory
+
+```bash
+vulcn crawl https://example.com -o ./scans
+```
+
+### Crawl → Scan Pipeline
+
+```bash
+vulcn crawl https://example.com --run-after xss sqli
+```
+
+Crawls the site, then automatically runs XSS and SQL injection tests on every discovered form.
+
+### Benchmarking Against DVWA
+
+```bash
+docker run -d -p 80:80 vulnerables/web-dvwa
+vulcn crawl http://localhost -d 3 --run-after xss sqli -r html
+```
+
+<Tip>
+  The `--run-after` flag is the fastest way to go from zero to a full security
+  assessment. It chains crawling directly into scanning without any manual
+  session management.
+</Tip>
+
+## Output
+
+The crawl command generates session files named by page and form:
+
+```bash
+✔ Crawl complete: 5 pages, 3 forms found
+✔ Saved 3 session file(s) to ./sessions
+
+📋 Generated Sessions
+
+  1. 01-crawl-search-form-1-query.vulcn.yml
+     Crawl: /search — form 1 (query) — 1 injectable input(s)
+
+  2. 02-crawl-login-form-1-username-password.vulcn.yml
+     Crawl: /login — form 1 (username, password) — 2 injectable input(s)
+
+  3. 03-crawl-contact-form-1-name-email-message.vulcn.yml
+     Crawl: /contact — form 1 (name, email, message) — 3 injectable input(s)
+```
+
+### Generated Session Format
+
+Each session file contains navigating to the page, filling each injectable input, and submitting the form:
+
+```yaml
+name: "Crawl: /search — form 1 (query)"
+driver: browser
+driverConfig:
+  startUrl: https://example.com/search
+  browser: chromium
+  headless: true
+steps:
+  - id: step-1
+    type: browser.navigate
+    url: https://example.com/search
+  - id: step-2
+    type: browser.input
+    selector: 'form:nth-of-type(1) [name="query"]'
+    value: test
+    injectable: true
+  - id: step-3
+    type: browser.click
+    selector: form:nth-of-type(1) button
+```
+
+## See Also
+
+- [vulcn run](/cli/run) — Run security tests on generated sessions
+- [vulcn record](/cli/record) — Manually record browser interactions

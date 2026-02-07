@@ -1,0 +1,145 @@
+---
+title: "@vulcn/plugin-detect-sqli"
+seo:
+  title: "@vulcn/plugin-detect-sqli — SQL Injection Detection Plugin"
+  description: "Detect SQL injection vulnerabilities across MySQL, PostgreSQL, Oracle, SQLite, and MSSQL using error-based, timing-based, and response diffing techniques."
+description: "SQL injection detection via error patterns, timing analysis, and response diffing"
+---
+
+## Overview
+
+The SQL injection detection plugin identifies SQLi vulnerabilities using three complementary detection strategies:
+
+| Strategy          | How It Works                                          | Databases                                |
+| ----------------- | ----------------------------------------------------- | ---------------------------------------- |
+| **Error-based**   | Matches 30+ database error patterns in responses      | MySQL, PostgreSQL, Oracle, SQLite, MSSQL |
+| **Response diff** | Compares baseline vs payload response characteristics | All                                      |
+| **Timing-based**  | Detects SLEEP/WAITFOR execution via response delay    | All                                      |
+
+## Installation
+
+The plugin is auto-loaded by the CLI when SQL injection payloads are used:
+
+```bash
+vulcn run session.vulcn.yml -p sqli
+```
+
+For manual installation:
+
+```bash
+npm install @vulcn/plugin-detect-sqli
+```
+
+## Configuration
+
+```yaml
+plugins:
+  - name: "@vulcn/plugin-detect-sqli"
+    config:
+      detectErrors: true
+      detectDiff: true
+      detectTiming: true
+      timingThresholdMs: 4000
+      errorSeverity: high
+      timingSeverity: high
+      diffSeverity: medium
+```
+
+## Options
+
+| Option                 | Type    | Default    | Description                                   |
+| ---------------------- | ------- | ---------- | --------------------------------------------- |
+| `detectErrors`         | boolean | `true`     | Enable error-based detection                  |
+| `detectDiff`           | boolean | `true`     | Enable response body diffing                  |
+| `detectTiming`         | boolean | `true`     | Enable timing-based detection                 |
+| `timingThresholdMs`    | number  | `4000`     | Response time threshold for blind SQLi (ms)   |
+| `errorStatusThreshold` | number  | `400`      | HTTP status code threshold for error checking |
+| `errorSeverity`        | string  | `"high"`   | Severity for error-based findings             |
+| `timingSeverity`       | string  | `"high"`   | Severity for timing-based findings            |
+| `diffSeverity`         | string  | `"medium"` | Severity for diff-based findings              |
+
+## Detection Methods
+
+### Error-Based Detection
+
+Scans both page content (`onAfterPayload`) and network responses (`onNetworkResponse`) for database error messages. Covers 30+ patterns across 5 database engines:
+
+**MySQL**
+
+- `You have an error in your SQL syntax`
+- `Warning: mysql_` / `mysql_fetch_array()`
+- `MySqlException`, `com.mysql.jdbc`
+
+**PostgreSQL**
+
+- `pg_query()` / `pg_exec()`
+- `PSQLException`, `org.postgresql`
+- `ERROR: syntax error at or near`
+
+**Oracle**
+
+- `ORA-XXXXX` error codes
+- `quoted string not properly terminated`
+
+**SQLite**
+
+- `sqlite3.OperationalError`
+- `SQLITE_ERROR`, `unrecognized token`
+
+**MSSQL**
+
+- `Unclosed quotation mark`
+- `SqlException`, `Incorrect syntax near`
+
+### Response Diffing
+
+Compares response characteristics before and after payload injection:
+
+- **Body length change** — if the response body changes by >50% (and >500 bytes) and contains SQL error patterns, it's flagged
+- Helps catch cases where errors appear in the DOM but aren't classic error messages
+
+### Timing-Based Detection
+
+For blind SQL injection where no errors are visible:
+
+- Only activates for payloads containing `SLEEP(`, `WAITFOR DELAY`, `BENCHMARK(`, `pg_sleep(`, or `DBMS_LOCK.SLEEP`
+- If response time exceeds the `timingThresholdMs` threshold, the SQL command executed — confirming injection
+
+## Example Output
+
+```bash
+🚨 SQLi DETECTED (MySQL): MySQL syntax error
+
+[HIGH] SQL Injection: MySQL error detected
+  Type: sqli
+  Step: step_002
+  URL: https://example.com/search
+  Payload: ' OR '1'='1' --
+  Evidence: ...You have an error in your SQL syntax...
+```
+
+## Auto-Loading
+
+The CLI automatically loads this plugin when SQL injection payloads are requested:
+
+```bash
+# These all trigger auto-loading:
+vulcn run session.yml -p sqli
+vulcn run session.yml -p sql
+vulcn run session.yml -p sql-injection
+```
+
+No configuration needed — just use `sqli` payloads and detection is active.
+
+## Hooks Used
+
+| Hook                | Purpose                                              |
+| ------------------- | ---------------------------------------------------- |
+| `onAfterPayload`    | Check page content for SQL errors, run diff + timing |
+| `onNetworkResponse` | Monitor API/XHR responses for SQL errors             |
+
+## See Also
+
+- [Payload Types](/cli/payloads) — Available payload types including `sqli`
+- [@vulcn/plugin-detect-xss](/plugins/plugin-detect-xss) — XSS detection plugin
+- [Plugin Hooks](/plugins/hooks) — All available plugin hooks

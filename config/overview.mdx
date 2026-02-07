@@ -32,12 +32,9 @@ plugins:
   # Payload loading
   - name: "@vulcn/plugin-payloads"
     config:
-      builtin: true
-      include:
-        - xss-basic
-        - sqli-basic
-      payloadbox:
+      types:
         - xss
+        - sqli
       files:
         - ./custom-payloads.yml
 

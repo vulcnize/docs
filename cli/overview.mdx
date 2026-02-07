@@ -25,11 +25,14 @@ vulcn [command] [options]
   <Card title="record" icon="circle-dot" href="/cli/record">
     Record browser interactions into a session file
   </Card>
+  <Card title="crawl" icon="spider" href="/cli/crawl">
+    Auto-discover forms and injection points
+  </Card>
   <Card title="run" icon="play" href="/cli/run">
     Run security tests on a recorded session
   </Card>
   <Card title="payloads" icon="syringe" href="/cli/payloads">
-    List available payload sets
+    List available payload types
   </Card>
   <Card title="plugin" icon="plug" href="/cli/plugin">
     Manage plugins in your configuration
@@ -44,17 +47,18 @@ vulcn [command] [options]
 
 ## Quick Reference
 
-| Command                      | Description                 |
-| ---------------------------- | --------------------------- |
-| `vulcn record <url>`         | Record browser interactions |
-| `vulcn run <session>`        | Run security tests          |
-| `vulcn payloads`             | List available payloads     |
-| `vulcn plugin list`          | List configured plugins     |
-| `vulcn plugin add <name>`    | Add a plugin                |
-| `vulcn plugin remove <name>` | Remove a plugin             |
-| `vulcn init`                 | Create config file          |
-| `vulcn install`              | Install browsers            |
-| `vulcn doctor`               | Check environment           |
+| Command                      | Description                    |
+| ---------------------------- | ------------------------------ |
+| `vulcn record <url>`         | Record browser interactions    |
+| `vulcn crawl <url>`          | Auto-discover forms and inputs |
+| `vulcn run <session>`        | Run security tests             |
+| `vulcn payloads`             | List available payload types   |
+| `vulcn plugin list`          | List configured plugins        |
+| `vulcn plugin add <name>`    | Add a plugin                   |
+| `vulcn plugin remove <name>` | Remove a plugin                |
+| `vulcn init`                 | Create config file             |
+| `vulcn install`              | Install browsers               |
+| `vulcn doctor`               | Check environment              |
 
 ## Examples
 
@@ -70,8 +74,8 @@ vulcn record https://example.com -o session.vulcn.yml
 # Run with default payloads
 vulcn run session.vulcn.yml
 
-# Run with specific payloads
-vulcn run session.vulcn.yml --payload xss-basic sqli-basic
+# Run with specific payload types
+vulcn run session.vulcn.yml -p xss sqli
 ```
 
 ### Plugin Management

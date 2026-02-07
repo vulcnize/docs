@@ -106,10 +106,9 @@ flowchart TB
 
 <Accordion title="💉 Payload Injection" icon="syringe">
   Automatically injects security payloads into injectable fields during replay.
-  Built-in payloads cover XSS, SQLi, SSRF, XXE, and more. Supports PayloadBox
-  integration for thousands of community payloads. ```bash vulcn run
-  session.vulcn.yml --payload xss-basic sqli-basic # Use PayloadBox community
-  payloads vulcn run session.vulcn.yml --payload payloadbox:xss ```
+  Payloads are fetched from PayloadsAllTheThings on demand. Use short aliases
+  for quick access to common types. ```bash vulcn run session.vulcn.yml -p xss
+  sqli cmd ```
 </Accordion>
 
 <Accordion title="🔌 Plugin System" icon="plug">
@@ -148,8 +147,8 @@ flowchart TB
     captures every action as a replayable session.
   </Step>
   <Step title="Choose Payloads">
-    Select from built-in payloads (XSS, SQLi, etc.), use PayloadBox community
-    payloads, or load custom ones from files.
+    Select from community-curated payload types (xss, sqli, xxe, cmd, redirect,
+    traversal), or load custom ones from files.
   </Step>
   <Step title="Run Tests">
     Vulcn replays your session, injecting each payload into every input field
@@ -196,24 +195,25 @@ vulcn record https://vulnerable-app.com --output session.vulcn.yml
 # Run security tests
 vulcn run session.vulcn.yml
 
-# Run with PayloadBox payloads and generate a report
-vulcn run session.vulcn.yml --payload payloadbox:xss --report html
+# Run with multiple payload types and generate a report
+vulcn run session.vulcn.yml -p xss sqli -r html
 
-# List available payloads
+# List available payload types
 vulcn payloads
 ```
 
 ## Packages
 
-| Package                           | Description                                     |
-| --------------------------------- | ----------------------------------------------- |
-| `vulcn`                           | CLI tool — record, run, and manage plugins      |
-| `@vulcn/engine`                   | Core engine with driver & plugin systems        |
-| `@vulcn/driver-browser`           | Playwright-based browser recording & replay     |
-| `@vulcn/plugin-payloads`          | XSS, SQLi, SSRF payloads + PayloadBox support   |
-| `@vulcn/plugin-detect-xss`        | Execution-based XSS detection                   |
-| `@vulcn/plugin-detect-reflection` | Input reflection & output encoding detection    |
-| `@vulcn/plugin-report`            | HTML, JSON, and YAML security report generation |
+| Package                           | Description                                       |
+| --------------------------------- | ------------------------------------------------- |
+| `vulcn`                           | CLI tool — record, crawl, run, and manage plugins |
+| `@vulcn/engine`                   | Core engine with driver & plugin systems          |
+| `@vulcn/driver-browser`           | Playwright-based browser recording & replay       |
+| `@vulcn/plugin-payloads`          | Payload loading from PayloadsAllTheThings         |
+| `@vulcn/plugin-detect-xss`        | Execution-based XSS detection                     |
+| `@vulcn/plugin-detect-sqli`       | SQL injection detection (error, timing, diff)     |
+| `@vulcn/plugin-detect-reflection` | Input reflection & output encoding detection      |
+| `@vulcn/plugin-report`            | HTML, JSON, and YAML security report generation   |
 
 <Card title="Ready to start?" icon="rocket" href="/quickstart">
   Follow our quickstart guide to find your first vulnerability

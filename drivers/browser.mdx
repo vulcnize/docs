@@ -146,6 +146,89 @@ vulcn install chromium
 vulcn install --all
 ```
 
+## Auto-Crawl
+
+The browser driver supports **auto-crawl** — an automated mode that discovers forms, inputs, and injection points without manual recording. Think of it as a lightweight spider that generates sessions for you.
+
+### How it Works
+
+1. Opens a headless browser and navigates to the target URL
+2. Discovers all `<form>` elements and standalone inputs on the page
+3. Identifies injectable text-like inputs (text, search, url, email, tel, password, textarea)
+4. Finds submit triggers (submit buttons, untyped buttons, or falls back to Enter keypress)
+5. Follows same-origin links with configurable depth (BFS traversal)
+6. Generates a `Session` per discovered form with `navigate → input → submit` steps
+
+### Configuration
+
+| Option        | Type      | Default | Description                                        |
+| ------------- | --------- | ------- | -------------------------------------------------- |
+| `maxDepth`    | `number`  | `2`     | Maximum link-following depth (0 = target URL only) |
+| `maxPages`    | `number`  | `20`    | Maximum number of pages to crawl                   |
+| `pageTimeout` | `number`  | `10000` | Page load timeout in milliseconds                  |
+| `sameOrigin`  | `boolean` | `true`  | Only follow links to the same origin               |
+
+### CLI Usage
+
+```bash
+# Auto-crawl instead of manual recording
+vulcn record https://example.com --auto
+
+# With depth control
+vulcn record https://example.com --auto --depth 3 --max-pages 50
+```
+
+### Programmatic Usage
+
+```typescript
+import { DriverManager } from "@vulcn/engine";
+import browserDriver from "@vulcn/driver-browser";
+
+const manager = new DriverManager();
+manager.register(browserDriver);
+
+// Auto-discover forms
+const sessions = await manager.crawl(
+  "browser",
+  {
+    startUrl: "https://example.com",
+    browser: "chromium",
+    headless: true,
+  },
+  {
+    maxDepth: 2,
+    maxPages: 20,
+  },
+);
+
+console.log(`Found ${sessions.length} injectable forms`);
+
+// Execute each session with payloads
+for (const session of sessions) {
+  const result = await manager.execute(session, pluginManager);
+  console.log(`${session.name}: ${result.findings.length} findings`);
+}
+```
+
+### Direct Access
+
+You can also use the crawler directly without going through the engine:
+
+```typescript
+import { crawlAndBuildSessions } from "@vulcn/driver-browser";
+
+const sessions = await crawlAndBuildSessions(
+  { startUrl: "https://example.com", headless: true },
+  { maxDepth: 1, maxPages: 5 },
+);
+```
+
+<Note>
+  Auto-crawl generates sessions with `injectable: true` on all discovered text
+  inputs. During replay, Vulcn injects payloads into these fields and triggers
+  the form submission.
+</Note>
+
 ## Programmatic Usage
 
 ### Recording

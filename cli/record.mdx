@@ -22,10 +22,15 @@ vulcn record <url> [options]
 | `-o, --output <file>`     | Output file path                           | `session.vulcn.yml` |
 | `-b, --browser <browser>` | Browser to use (chromium, firefox, webkit) | `chromium`          |
 | `--headless`              | Run in headless mode                       | `false`             |
+| `--auto`                  | Auto-crawl: discover forms automatically   | `false`             |
+| `--depth <number>`        | Max crawl depth (with `--auto`)            | `2`                 |
+| `--max-pages <number>`    | Max pages to crawl (with `--auto`)         | `20`                |
 
 ## Description
 
 The `record` command opens a browser window and captures your interactions with a web application. Every click, form input, and navigation is recorded into a session file that can be replayed with security payloads.
+
+With the `--auto` flag, Vulcn skips manual recording and instead automatically crawls the target URL to discover forms and injectable inputs — similar to a web application spider.
 
 ## Examples
 
@@ -36,6 +41,18 @@ vulcn record https://example.com
 ```
 
 This opens Chromium, records your interactions, and saves to `session.vulcn.yml`.
+
+### Auto-Crawl
+
+```bash
+# Discover forms automatically (no manual interaction needed)
+vulcn record https://example.com --auto
+
+# Control crawl depth and scope
+vulcn record https://example.com --auto --depth 3 --max-pages 50
+```
+
+Auto-crawl generates one session per discovered injectable form, each with `navigate → input → submit` steps.
 
 ### Custom Output File
 

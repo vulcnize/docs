@@ -179,6 +179,58 @@ const handle = await manager.startRecording("browser", {
 const session = await handle.stop();
 ```
 
+### crawl
+
+Auto-crawl a URL to discover forms and generate sessions.
+
+```typescript
+async crawl(
+  driverName: string,
+  config: Record<string, unknown>,
+  options?: CrawlOptions
+): Promise<Session[]>
+```
+
+**Parameters:**
+
+- `driverName` - Name of the driver to use (must support crawling)
+- `config` - Driver-specific configuration (e.g., `startUrl`, `browser`)
+- `options` - Crawl options (depth, page limits, etc.)
+
+**Returns:** Array of `Session` objects, one per discovered injectable form.
+
+**Throws:** Error if the driver doesn't support auto-crawl.
+
+**Example:**
+
+```typescript
+const sessions = await manager.crawl(
+  "browser",
+  {
+    startUrl: "https://example.com",
+    browser: "chromium",
+    headless: true,
+  },
+  {
+    maxDepth: 2,
+    maxPages: 20,
+  },
+);
+
+console.log(`Discovered ${sessions.length} injectable forms`);
+
+// Execute each session with payloads
+for (const session of sessions) {
+  const result = await manager.execute(session, pluginManager);
+}
+```
+
+<Info>
+  Not all drivers support `crawl()`. Currently only the browser driver
+  implements auto-crawl. Calling `crawl()` on a driver that doesn't support it
+  throws a clear error.
+</Info>
+
 ### execute
 
 Execute a session with payloads.
@@ -246,6 +298,23 @@ interface RecordingHandle {
   abort(): Promise<void>;
   getSteps(): Step[];
   addStep(step: Omit<Step, "id" | "timestamp">): void;
+}
+```
+
+### CrawlOptions
+
+```typescript
+interface CrawlOptions {
+  /** Maximum crawl depth (0 = only the given URL, default: 2) */
+  maxDepth?: number;
+  /** Maximum number of pages to visit (default: 20) */
+  maxPages?: number;
+  /** Page load timeout in milliseconds (default: 10000) */
+  pageTimeout?: number;
+  /** Only follow same-origin links (default: true) */
+  sameOrigin?: boolean;
+  /** Callback fired after each page is crawled */
+  onPageCrawled?: (url: string, formsFound: number) => void;
 }
 ```
 

@@ -40,6 +40,7 @@ A driver is a package that provides:
 
 1. **RecorderDriver** - Captures interactions for a specific target type
 2. **RunnerDriver** - Replays sessions with payload injection
+3. **Auto-Crawl** _(optional)_ - Automatically discovers forms and injection points
 
 Each driver defines its own step types. For example, the browser driver defines:
 
@@ -107,6 +108,12 @@ interface RecorderDriver {
     config: Record<string, unknown>,
     options: RecordOptions,
   ): Promise<RecordingHandle>;
+
+  // Optional: auto-discover forms and generate sessions
+  crawl?(
+    config: Record<string, unknown>,
+    options: CrawlOptions,
+  ): Promise<Session[]>;
 }
 
 interface RecordingHandle {
@@ -116,6 +123,12 @@ interface RecordingHandle {
   addStep(step: Omit<Step, "id" | "timestamp">): void;
 }
 ```
+
+<Info>
+  The `crawl()` method is optional. Only drivers that support automated form
+  discovery need to implement it. Currently, only the browser driver supports
+  auto-crawl.
+</Info>
 
 ### RunnerDriver
 
@@ -135,6 +148,9 @@ vulcn record https://example.com
 
 # Specify driver explicitly
 vulcn record https://example.com --driver browser
+
+# Auto-crawl: discover forms automatically (no manual recording)
+vulcn record https://example.com --auto
 ```
 
 ### Programmatically
@@ -146,15 +162,28 @@ import browserDriver from "@vulcn/driver-browser";
 // Register driver
 driverManager.register(browserDriver);
 
-// Start recording
+// Option 1: Manual recording
 const handle = await driverManager.startRecording("browser", {
   startUrl: "https://example.com",
   browser: "chromium",
 });
 
 // ... user interacts ...
-
 const session = await handle.stop();
+
+// Option 2: Auto-crawl (discovers forms automatically)
+const sessions = await driverManager.crawl(
+  "browser",
+  {
+    startUrl: "https://example.com",
+    browser: "chromium",
+    headless: true,
+  },
+  {
+    maxDepth: 2,
+    maxPages: 20,
+  },
+);
 ```
 
 ## Creating Custom Drivers

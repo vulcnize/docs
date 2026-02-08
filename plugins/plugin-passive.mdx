@@ -1,0 +1,207 @@
+---
+title: "@vulcn/plugin-passive"
+description: "Passive security scanner — detects misconfigurations without injecting payloads"
+---
+
+## Overview
+
+The passive scanner analyzes HTTP responses during session replay **without injecting any payloads**. It detects security misconfigurations by inspecting network traffic that occurs naturally during session replay, making it completely non-intrusive and safe for production environments.
+
+## What It Detects
+
+<CardGroup cols={2}>
+  <Card title="Security Headers" icon="shield-halved">
+    Missing HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy,
+    Permissions-Policy
+  </Card>
+  <Card title="Cookie Security" icon="cookie">
+    Missing Secure, HttpOnly, SameSite flags on session cookies
+  </Card>
+  <Card title="Information Disclosure" icon="eye">
+    Server version headers, X-Powered-By, debug tokens, stack traces
+  </Card>
+  <Card title="CORS Misconfiguration" icon="globe">
+    Wildcard origins, credentials with wildcards, overly permissive policies
+  </Card>
+  <Card title="Mixed Content" icon="lock-open">
+    HTTP resources loaded on HTTPS pages (man-in-the-middle risk)
+  </Card>
+</CardGroup>
+
+## Installation
+
+```bash
+npm install @vulcn/plugin-passive
+```
+
+## CLI Usage
+
+Enable the passive scanner with the `--passive` flag:
+
+```bash
+# Run active + passive scanning together
+vulcn run session.vulcn.yml -p xss --passive
+
+# Passive scanning with HTML report
+vulcn run session.vulcn.yml --passive -r html
+
+# Passive + active scanning with SARIF output for CI/CD
+vulcn run session.vulcn.yml -p xss sqli --passive -r sarif
+```
+
+## Configuration
+
+```yaml
+plugins:
+  - name: "@vulcn/plugin-passive"
+    config:
+      # Enable/disable specific checks
+      detectHeaders: true # Security response headers
+      detectCookies: true # Cookie security attributes
+      detectInfoLeak: true # Information disclosure
+      detectCors: true # CORS misconfigurations
+      detectMixed: true # Mixed content (HTTP on HTTPS)
+
+      # Severity overrides
+      headerSeverity: medium # Missing security headers
+      cookieSeverity: medium # Insecure cookies
+      infoLeakSeverity: low # Information disclosure
+      corsSeverity: high # CORS issues
+      mixedContentSeverity: medium
+```
+
+| Option                 | Type    | Default  | Description                                 |
+| ---------------------- | ------- | -------- | ------------------------------------------- |
+| `detectHeaders`        | boolean | `true`   | Check for missing security headers          |
+| `detectCookies`        | boolean | `true`   | Check for insecure cookie configurations    |
+| `detectInfoLeak`       | boolean | `true`   | Check for information disclosure in headers |
+| `detectCors`           | boolean | `true`   | Check for CORS misconfigurations            |
+| `detectMixed`          | boolean | `true`   | Check for mixed content (HTTP on HTTPS)     |
+| `headerSeverity`       | string  | `medium` | Severity for missing headers                |
+| `cookieSeverity`       | string  | `medium` | Severity for cookie issues                  |
+| `infoLeakSeverity`     | string  | `low`    | Severity for information disclosure         |
+| `corsSeverity`         | string  | `high`   | Severity for CORS misconfigurations         |
+| `mixedContentSeverity` | string  | `medium` | Severity for mixed content                  |
+
+## Security Header Checks
+
+The plugin checks for these security response headers on HTML responses:
+
+| Header                      | CWE      | Why It Matters                                                 |
+| --------------------------- | -------- | -------------------------------------------------------------- |
+| `Strict-Transport-Security` | CWE-319  | Without HSTS, first visit may use HTTP, enabling MITM attacks  |
+| `Content-Security-Policy`   | CWE-693  | Without CSP, no restrictions on script/resource sources (XSS)  |
+| `X-Content-Type-Options`    | CWE-16   | Without `nosniff`, browsers may MIME-sniff and execute scripts |
+| `X-Frame-Options`           | CWE-1021 | Without framing protection, clickjacking attacks are possible  |
+| `Referrer-Policy`           | CWE-200  | Full URLs (with query params) may leak to third parties        |
+| `Permissions-Policy`        | CWE-16   | Embedded content can access camera, mic, geolocation           |
+
+### Value Validation
+
+When headers are present, the plugin also validates their values:
+
+- **HSTS**: Warns if `max-age` is less than 1 year (31536000 seconds)
+- **CSP**: Warns if `unsafe-inline` or `unsafe-eval` directives are used
+- **X-Content-Type-Options**: Warns if not set to `nosniff`
+- **X-Frame-Options**: Warns if not `DENY` or `SAMEORIGIN`
+
+## Cookie Security Checks
+
+The plugin inspects `Set-Cookie` headers for:
+
+| Issue                        | CWE     | Risk                                                    |
+| ---------------------------- | ------- | ------------------------------------------------------- |
+| Missing `Secure` flag        | CWE-614 | Cookie transmitted over unencrypted HTTP                |
+| Missing `HttpOnly` flag      | CWE-614 | Cookie accessible to JavaScript (session theft via XSS) |
+| Missing `SameSite`           | CWE-614 | Cookie sent with cross-site requests (CSRF)             |
+| `SameSite=None` w/o `Secure` | CWE-614 | Browser rejects the cookie entirely                     |
+
+<Note>
+  HttpOnly checks are only applied to cookies whose names suggest they are
+  session-related (containing `session`, `sid`, `token`, `auth`, `jwt`, or
+  `csrf`).
+</Note>
+
+## Information Disclosure Checks
+
+Headers that reveal implementation details:
+
+| Header                | What It Reveals                  |
+| --------------------- | -------------------------------- |
+| `Server` (with `/`)   | Web server software + version    |
+| `X-Powered-By`        | Application framework            |
+| `X-AspNet-Version`    | Exact ASP.NET version            |
+| `X-AspNetMvc-Version` | Exact ASP.NET MVC version        |
+| `X-Debug-Token`       | Debug mode enabled in production |
+| `X-Debug-Token-Link`  | Direct link to debug profiler    |
+
+## CORS Misconfiguration Checks
+
+| Issue                            | Severity | Risk                                       |
+| -------------------------------- | -------- | ------------------------------------------ |
+| `Access-Control-Allow-Origin: *` | High     | Any website can make cross-origin requests |
+| Wildcard origin + credentials    | Critical | Bypasses same-origin policy for auth       |
+| Specific origin + credentials    | Info     | Verify origin is trusted                   |
+
+## Deduplication
+
+The passive scanner automatically deduplicates findings:
+
+- Each unique issue is reported **once per origin** (scheme + host)
+- Static assets (CSS, JS, images, fonts) are automatically skipped
+- Only HTML responses are checked for security headers
+- Redirect responses (3xx) are skipped
+
+## How It Works
+
+The passive scanner hooks into the `onRunStart` lifecycle event to attach a Playwright response listener. As the session replays naturally, every HTTP response is analyzed:
+
+```
+Session Replay → HTTP Response → Passive Analysis → Findings
+                                  ├── Headers check
+                                  ├── Cookie check
+                                  ├── Info disclosure check
+                                  ├── CORS check
+                                  └── Mixed content check
+```
+
+No additional requests are made. The scanner only observes traffic that would occur during normal replay.
+
+## Example Output
+
+```
+🔍 Passive scanner listening for network responses...
+🛡️  Passive scan complete — 5 issues found
+
+[MEDIUM] Missing Strict-Transport-Security (HSTS)
+  Type: security-misconfiguration
+  Step: passive-scan
+  URL: https://example.com/login
+
+[MEDIUM] Cookie: Missing HttpOnly flag — session_id
+  Type: security-misconfiguration
+  Step: passive-scan
+  URL: https://example.com/login
+
+[LOW] Technology Stack Disclosed (X-Powered-By)
+  Type: information-disclosure
+  Step: passive-scan
+  URL: https://example.com/login
+```
+
+## Combining with Active Scanning
+
+The passive scanner complements active payload-based testing:
+
+```bash
+# Full security assessment: active XSS + SQLi + passive checks
+vulcn run session.vulcn.yml -p xss sqli --passive -r html
+
+# Passive-only (still requires payloads for session replay)
+vulcn run session.vulcn.yml --passive -r json
+```
+
+<Tip>
+  The passive scanner runs alongside active testing with zero performance
+  overhead — it only observes existing network traffic.
+</Tip>

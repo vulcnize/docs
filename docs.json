@@ -62,6 +62,7 @@
               "plugins/plugin-detect-xss",
               "plugins/plugin-detect-sqli",
               "plugins/plugin-detect-reflection",
+              "plugins/plugin-passive",
               "plugins/plugin-report"
             ]
           },

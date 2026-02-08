@@ -160,24 +160,62 @@ Input reflection and output encoding detection:
 | `scriptSeverity`    | string  | `"medium"` | Severity for script reflection      |
 | `attributeSeverity` | string  | `"medium"` | Severity for attribute reflection   |
 
+### @vulcn/plugin-passive
+
+Passive security scanner (no payload injection):
+
+```yaml
+- name: "@vulcn/plugin-passive"
+  config:
+    # Enable/disable specific checks
+    detectHeaders: true
+    detectCookies: true
+    detectInfoLeak: true
+    detectCors: true
+    detectMixed: true
+
+    # Severity overrides
+    headerSeverity: medium
+    corsSeverity: high
+```
+
+| Option                 | Type    | Default  | Description                              |
+| ---------------------- | ------- | -------- | ---------------------------------------- |
+| `detectHeaders`        | boolean | `true`   | Check for missing security headers       |
+| `detectCookies`        | boolean | `true`   | Check for insecure cookie configurations |
+| `detectInfoLeak`       | boolean | `true`   | Check for information disclosure         |
+| `detectCors`           | boolean | `true`   | Check for CORS misconfigurations         |
+| `detectMixed`          | boolean | `true`   | Check for mixed content (HTTP on HTTPS)  |
+| `headerSeverity`       | string  | `medium` | Severity for missing headers             |
+| `cookieSeverity`       | string  | `medium` | Severity for cookie issues               |
+| `infoLeakSeverity`     | string  | `low`    | Severity for information disclosure      |
+| `corsSeverity`         | string  | `high`   | Severity for CORS misconfigurations      |
+| `mixedContentSeverity` | string  | `medium` | Severity for mixed content               |
+
+<Tip>
+  Use `--passive` on the CLI to auto-load this plugin without editing your
+  config. See the [Passive Scanner docs](/plugins/plugin-passive) for full
+  details.
+</Tip>
+
 ### @vulcn/plugin-report
 
-Security report generation (HTML, JSON, YAML):
+Security report generation (HTML, JSON, YAML, SARIF):
 
 ```yaml
 - name: "@vulcn/plugin-report"
   config:
-    # Output format: html, json, yaml, all
+    # Output format: html, json, yaml, sarif, all
     format: html
 
     # Directory to write reports
     outputDir: ./reports
 ```
 
-| Option      | Type   | Default | Description                                  |
-| ----------- | ------ | ------- | -------------------------------------------- |
-| `format`    | string | `html`  | Report format: `html`, `json`, `yaml`, `all` |
-| `outputDir` | string | `.`     | Output directory for report files            |
+| Option      | Type   | Default | Description                                           |
+| ----------- | ------ | ------- | ----------------------------------------------------- |
+| `format`    | string | `html`  | Report format: `html`, `json`, `yaml`, `sarif`, `all` |
+| `outputDir` | string | `.`     | Output directory for report files                     |
 
 <Tip>
   The `--report` and `--report-output` CLI flags override the config file

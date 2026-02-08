@@ -20,15 +20,16 @@ vulcn run <session> [options]
 
 ## Options
 
-| Option                      | Description                                    | Default    |
-| --------------------------- | ---------------------------------------------- | ---------- |
-| `-p, --payload <names...>`  | Payload types to use (xss, sqli, cmd, etc.)    | `xss`      |
-| `-f, --payload-file <file>` | Load custom payloads from YAML/JSON file       | -          |
-| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)     | `chromium` |
-| `--headless`                | Run in headless mode                           | `true`     |
-| `--no-headless`             | Run with visible browser                       | -          |
-| `-r, --report <format>`     | Generate report: `html`, `json`, `yaml`, `all` | -          |
-| `--report-output <dir>`     | Output directory for reports                   | `.`        |
+| Option                      | Description                                              | Default    |
+| --------------------------- | -------------------------------------------------------- | ---------- |
+| `-p, --payload <names...>`  | Payload types to use (xss, sqli, cmd, etc.)              | `xss`      |
+| `-f, --payload-file <file>` | Load custom payloads from YAML/JSON file                 | -          |
+| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)               | `chromium` |
+| `--headless`                | Run in headless mode                                     | `true`     |
+| `--no-headless`             | Run with visible browser                                 | -          |
+| `-r, --report <format>`     | Generate report: `html`, `json`, `yaml`, `sarif`, `all`  | -          |
+| `--report-output <dir>`     | Output directory for reports                             | `.`        |
+| `--passive`                 | Enable passive security scanner (headers, cookies, CORS) | -          |
 
 ## Description
 
@@ -125,12 +126,47 @@ Produces a machine-readable JSON file for pipeline integration, SIEM ingestion, 
 vulcn run session.vulcn.yml --report all --report-output ./reports
 ```
 
-Generates HTML, JSON, and YAML reports in the specified output directory.
+Generates HTML, JSON, YAML, and SARIF reports in the specified output directory.
+
+### SARIF Report (for GitHub Code Scanning)
+
+```bash
+vulcn run session.vulcn.yml --report sarif
+```
+
+Produces a [SARIF v2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) file with CWE mappings—upload directly to GitHub Code Scanning:
+
+```yaml
+# .github/workflows/vulcn.yml
+- name: Run Vulcn
+  run: vulcn run session.vulcn.yml -p xss sqli -r sarif
+
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v3
+  if: always()
+  with:
+    sarif_file: vulcn-report.sarif
+    category: vulcn-dast
+```
 
 <Tip>
   Combine reports with multiple payload types for comprehensive scans: ```bash
   vulcn run session.vulcn.yml -p xss sqli -r html ```
 </Tip>
+
+## Passive Security Scanning
+
+Add `--passive` to analyze HTTP responses for security misconfigurations without injecting payloads:
+
+```bash
+# Active + passive scanning
+vulcn run session.vulcn.yml -p xss --passive -r html
+
+# Full security assessment
+vulcn run session.vulcn.yml -p xss sqli --passive -r sarif
+```
+
+The passive scanner detects missing security headers (HSTS, CSP), insecure cookies, information disclosure, CORS misconfigurations, and mixed content. See [`@vulcn/plugin-passive`](/plugins/plugin-passive) for details.
 
 ## Output
 

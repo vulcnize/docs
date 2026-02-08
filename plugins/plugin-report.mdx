@@ -1,13 +1,13 @@
 ---
 title: "@vulcn/plugin-report"
-description: "Generate modern HTML dashboards, machine-readable JSON, and YAML security reports from penetration test results"
+description: "Generate HTML dashboards, JSON, YAML, and SARIF v2.1.0 security reports for GitHub Code Scanning and CI/CD integration"
 ---
 
 ## Overview
 
-The report plugin generates branded, professional security reports at the end of each `vulcn run`. It supports three output formats and integrates seamlessly with CI/CD pipelines.
+The report plugin generates branded, professional security reports at the end of each `vulcn run`. It supports four output formats and integrates seamlessly with CI/CD pipelines and GitHub Code Scanning.
 
-<CardGroup cols={3}>
+<CardGroup cols={4}>
   <Card title="HTML" icon="file-code">
     Modern dark-themed dashboard with risk gauge, severity breakdown, and
     expandable finding cards
@@ -18,6 +18,10 @@ The report plugin generates branded, professional security reports at the end of
   </Card>
   <Card title="YAML" icon="file-lines">
     Human-readable YAML with descriptive headers — same data model as JSON
+  </Card>
+  <Card title="SARIF" icon="shield-check">
+    SARIF v2.1.0 for GitHub Code Scanning, Azure DevOps, and IDE integration
+    with CWE mappings
   </Card>
 </CardGroup>
 
@@ -55,6 +59,14 @@ The HTML report is saved to the current directory and automatically opens in you
 vulcn run session.vulcn.yml --report json
 ```
 
+### Generate SARIF for GitHub Code Scanning
+
+```bash
+vulcn run session.vulcn.yml --report sarif
+```
+
+Produces a SARIF v2.1.0 file compatible with GitHub Code Scanning, Azure DevOps, and other SARIF-consuming tools.
+
 ### Generate All Formats
 
 ```bash
@@ -64,15 +76,15 @@ vulcn run session.vulcn.yml --report all
 ### Custom Output Directory
 
 ```bash
-vulcn run session.vulcn.yml --report html --report-output ./reports
+vulcn run session.vulcn.yml --report sarif --report-output ./reports
 ```
 
 ## CLI Options
 
-| Option                  | Description                                  | Default |
-| ----------------------- | -------------------------------------------- | ------- |
-| `-r, --report <format>` | Report format: `html`, `json`, `yaml`, `all` | -       |
-| `--report-output <dir>` | Output directory for generated reports       | `.`     |
+| Option                  | Description                                           | Default |
+| ----------------------- | ----------------------------------------------------- | ------- |
+| `-r, --report <format>` | Report format: `html`, `json`, `yaml`, `sarif`, `all` | -       |
+| `--report-output <dir>` | Output directory for generated reports                | `.`     |
 
 ## Configuration
 
@@ -82,16 +94,172 @@ vulcn run session.vulcn.yml --report html --report-output ./reports
 plugins:
   - name: "@vulcn/plugin-report"
     config:
-      format: html
+      format: sarif
       outputDir: ./reports
 ```
 
 ### Config Options
 
-| Option      | Type     | Default | Description                                  |
-| ----------- | -------- | ------- | -------------------------------------------- |
-| `format`    | `string` | `html`  | Output format: `html`, `json`, `yaml`, `all` |
-| `outputDir` | `string` | `.`     | Directory to write report files              |
+| Option      | Type     | Default | Description                                           |
+| ----------- | -------- | ------- | ----------------------------------------------------- |
+| `format`    | `string` | `html`  | Output format: `html`, `json`, `yaml`, `sarif`, `all` |
+| `outputDir` | `string` | `.`     | Directory to write report files                       |
+
+## SARIF Output
+
+The SARIF (Static Analysis Results Interchange Format) output is designed for CI/CD integration, producing reports compatible with:
+
+- **GitHub Code Scanning** — findings appear in the Security tab
+- **Azure DevOps** — SARIF SAST Scans Tab extension
+- **VS Code** — SARIF Viewer extension
+- **Any SARIF v2.1.0 consumer**
+
+### Key Features
+
+- **CWE Mappings** — each vulnerability type maps to its CWE ID (XSS → CWE-79, SQLi → CWE-89, etc.)
+- **Security Severity Scores** — CVSS-like 0.0–10.0 scores for sorting in GitHub's Security tab
+- **Deterministic Fingerprints** — prevents duplicate alerts across runs
+- **Rule Deduplication** — one SARIF rule per vulnerability type, regardless of finding count
+- **Invocation Metadata** — session name, duration, steps executed, and payloads tested are preserved
+
+### SARIF Schema
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Vulcn",
+          "version": "0.4.0",
+          "informationUri": "https://vulcn.dev",
+          "rules": [
+            {
+              "id": "VULCN-XSS",
+              "shortDescription": { "text": "CWE-79: Cross-site Scripting" },
+              "helpUri": "https://cwe.mitre.org/data/definitions/79.html",
+              "properties": {
+                "tags": ["security", "CWE-79", "external/cwe/cwe-79"],
+                "security-severity": "7.0"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "VULCN-XSS",
+          "level": "error",
+          "message": { "text": "XSS Confirmed: alert() executed" },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "https://example.com/search" }
+              }
+            }
+          ],
+          "fingerprints": {
+            "vulcnFindingV1": "xss:step_003:<script>alert(1)</script>"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+### CWE Mappings
+
+| Vuln Type           | SARIF Rule ID             | CWE     | Security Severity |
+| ------------------- | ------------------------- | ------- | ----------------- |
+| `xss`               | `VULCN-XSS`               | CWE-79  | 7.0 (High)        |
+| `sqli`              | `VULCN-SQLI`              | CWE-89  | 9.0 (Critical)    |
+| `xxe`               | `VULCN-XXE`               | CWE-611 | 9.0 (Critical)    |
+| `command-injection` | `VULCN-COMMAND-INJECTION` | CWE-78  | 9.0 (Critical)    |
+| `path-traversal`    | `VULCN-PATH-TRAVERSAL`    | CWE-22  | 7.0 (High)        |
+| `open-redirect`     | `VULCN-OPEN-REDIRECT`     | CWE-601 | 4.0 (Medium)      |
+| `ssrf`              | `VULCN-SSRF`              | CWE-918 | 7.0 (High)        |
+
+## CI/CD Integration
+
+### GitHub Actions + Code Scanning
+
+```yaml
+name: Vulcn Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+  vulcn-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Vulcn
+        run: npm install -g @vulcn/cli
+
+      - name: Install browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run security scan
+        run: |
+          vulcn run session.vulcn.yml \
+            -p xss sqli \
+            -r sarif \
+            --report-output .
+
+      - name: Upload SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: vulcn-report.sarif
+          category: vulcn-dast
+```
+
+<Tip>
+  Use `if: always()` on the upload step so SARIF results are uploaded even when
+  vulnerabilities are found (exit code 1).
+</Tip>
+
+### GitLab CI
+
+```yaml
+security_scan:
+  script:
+    - vulcn run session.vulcn.yml --report json --report-output ./reports
+  artifacts:
+    paths:
+      - reports/
+    reports:
+      security: reports/vulcn-report.json
+```
+
+### Exit Codes
+
+| Code | Meaning                  |
+| ---- | ------------------------ |
+| `0`  | No vulnerabilities found |
+| `1`  | Vulnerabilities detected |
+
+Use the exit code to gate deployments:
+
+```bash
+vulcn run session.vulcn.yml --report sarif || exit 1
+```
 
 ## HTML Report Features
 
@@ -111,8 +279,8 @@ The HTML report is designed as a modern security dashboard:
 ```json
 {
   "vulcn": {
-    "version": "0.3.0",
-    "generatedAt": "2026-02-07T03:53:00Z"
+    "version": "0.4.0",
+    "generatedAt": "2026-02-08T00:00:00Z"
   },
   "session": {
     "name": "Login Flow Test",
@@ -159,76 +327,38 @@ The HTML report is designed as a modern security dashboard:
 }
 ```
 
-## CI/CD Integration
-
-### GitHub Actions
-
-```yaml
-- name: Run security tests
-  run: vulcn run session.vulcn.yml --report json --report-output ./reports
-
-- name: Upload report
-  uses: actions/upload-artifact@v4
-  with:
-    name: security-report
-    path: ./reports/
-```
-
-### GitLab CI
-
-```yaml
-security_scan:
-  script:
-    - vulcn run session.vulcn.yml --report json --report-output ./reports
-  artifacts:
-    paths:
-      - reports/
-    reports:
-      security: reports/vulcn-report.json
-```
-
-### Exit Codes
-
-| Code | Meaning                  |
-| ---- | ------------------------ |
-| `0`  | No vulnerabilities found |
-| `1`  | Vulnerabilities detected |
-
-Use the exit code to gate deployments:
-
-```bash
-vulcn run session.vulcn.yml --report all || exit 1
-```
-
 ## Programmatic Usage
 
 ```typescript
-import { generateHtml, generateJson, generateYaml } from "@vulcn/plugin-report";
+import {
+  generateHtml,
+  generateJson,
+  generateYaml,
+  generateSarif,
+} from "@vulcn/plugin-report";
 
-const reportData = {
-  session,
-  result,
-  generatedAt: new Date().toISOString(),
-  engineVersion: "0.3.0",
-};
+// HTML report
+const html = generateHtml({ session, result, generatedAt, engineVersion });
 
-// Generate HTML string
-const html = generateHtml(reportData);
+// JSON report
+const json = generateJson(session, result, generatedAt, engineVersion);
 
-// Generate JSON string
-const json = generateJson(reportData);
+// YAML report
+const yaml = generateYaml(session, result, generatedAt, engineVersion);
 
-// Generate YAML string
-const yaml = generateYaml(reportData);
+// SARIF report
+const sarif = generateSarif(session, result, generatedAt, engineVersion);
+await writeFile("vulcn-report.sarif", JSON.stringify(sarif, null, 2));
 ```
 
 ## Output Files
 
-| Format | Filename            | Content Type       |
-| ------ | ------------------- | ------------------ |
-| HTML   | `vulcn-report.html` | `text/html`        |
-| JSON   | `vulcn-report.json` | `application/json` |
-| YAML   | `vulcn-report.yaml` | `text/yaml`        |
+| Format | Filename             | Content Type       |
+| ------ | -------------------- | ------------------ |
+| HTML   | `vulcn-report.html`  | `text/html`        |
+| JSON   | `vulcn-report.json`  | `application/json` |
+| YAML   | `vulcn-report.yml`   | `text/yaml`        |
+| SARIF  | `vulcn-report.sarif` | `application/json` |
 
 <Card title="Plugin Hooks" icon="code" href="/plugins/hooks">
   The report plugin uses the `onRunEnd` hook — see all available hooks

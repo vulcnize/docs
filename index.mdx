@@ -15,7 +15,7 @@ Vulcn is a **modern, fast penetration testing framework** designed for developer
 1. **Record** interactions once (browser clicks, form submissions, navigation)
 2. **Replay** sessions with security payloads injected into every input
 3. **Detect** real vulnerabilities via execution-based detection (not just pattern matching)
-4. **Report** findings with branded HTML dashboards, JSON for CI/CD, or YAML
+4. **Report** findings with branded HTML dashboards, SARIF for GitHub Code Scanning, JSON for CI/CD, or YAML
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
@@ -155,8 +155,9 @@ flowchart TB
     and monitoring for vulnerabilities via execution-based detection.
   </Step>
   <Step title="Review Reports">
-    Get detailed HTML dashboards, JSON for CI/CD pipelines, or YAML reports—with
-    risk scores, severity breakdowns, and evidence for every finding.
+    Get detailed HTML dashboards, SARIF for GitHub Code Scanning, JSON for CI/CD
+    pipelines, or YAML reports—with risk scores, severity breakdowns, and
+    evidence for every finding.
   </Step>
 </Steps>
 
@@ -204,16 +205,17 @@ vulcn payloads
 
 ## Packages
 
-| Package                           | Description                                       |
-| --------------------------------- | ------------------------------------------------- |
-| `vulcn`                           | CLI tool — record, crawl, run, and manage plugins |
-| `@vulcn/engine`                   | Core engine with driver & plugin systems          |
-| `@vulcn/driver-browser`           | Playwright-based browser recording & replay       |
-| `@vulcn/plugin-payloads`          | Payload loading from PayloadsAllTheThings         |
-| `@vulcn/plugin-detect-xss`        | Execution-based XSS detection                     |
-| `@vulcn/plugin-detect-sqli`       | SQL injection detection (error, timing, diff)     |
-| `@vulcn/plugin-detect-reflection` | Input reflection & output encoding detection      |
-| `@vulcn/plugin-report`            | HTML, JSON, and YAML security report generation   |
+| Package                           | Description                                               |
+| --------------------------------- | --------------------------------------------------------- |
+| `vulcn`                           | CLI tool — record, crawl, run, and manage plugins         |
+| `@vulcn/engine`                   | Core engine with driver & plugin systems                  |
+| `@vulcn/driver-browser`           | Playwright-based browser recording & replay               |
+| `@vulcn/plugin-payloads`          | Payload loading from PayloadsAllTheThings                 |
+| `@vulcn/plugin-detect-xss`        | Execution-based XSS detection                             |
+| `@vulcn/plugin-detect-sqli`       | SQL injection detection (error, timing, diff)             |
+| `@vulcn/plugin-detect-reflection` | Input reflection & output encoding detection              |
+| `@vulcn/plugin-passive`           | Passive scanner — headers, cookies, info disclosure, CORS |
+| `@vulcn/plugin-report`            | HTML, JSON, YAML, and SARIF security report generation    |
 
 <Card title="Ready to start?" icon="rocket" href="/quickstart">
   Follow our quickstart guide to find your first vulnerability

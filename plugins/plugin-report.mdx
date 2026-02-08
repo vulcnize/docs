@@ -5,12 +5,12 @@ description: "Generate HTML dashboards, JSON, YAML, and SARIF v2.1.0 security re
 
 ## Overview
 
-The report plugin generates branded, professional security reports at the end of each `vulcn run`. It supports four output formats and integrates seamlessly with CI/CD pipelines and GitHub Code Scanning.
+The report plugin generates branded, professional security reports at the end of each `vulcn run`. All formats are derived from the **canonical `VulcnReport` model** — a single source of truth built once via `buildReport()`, ensuring consistency across HTML, JSON, YAML, and SARIF outputs.
 
 <CardGroup cols={4}>
   <Card title="HTML" icon="file-code">
-    Modern dark-themed dashboard with risk gauge, severity breakdown, and
-    expandable finding cards
+    Modern dark-themed dashboard with risk gauge, severity breakdown, passive
+    analysis, and expandable finding cards
   </Card>
   <Card title="JSON" icon="braces">
     Machine-readable structured output for CI/CD pipelines, SIEM integration,
@@ -105,6 +105,47 @@ plugins:
 | `format`    | `string` | `html`  | Output format: `html`, `json`, `yaml`, `sarif`, `all` |
 | `outputDir` | `string` | `.`     | Directory to write report files                       |
 
+## VulcnReport Model
+
+Starting from v0.5.0, all output formats are projections of the canonical `VulcnReport` model. This model enriches raw scan results with CWE mappings, fingerprints, risk scoring, and passive analysis categorisation.
+
+```
+RunResult + Session
+       ↓
+  buildReport()
+       ↓
+  VulcnReport (canonical)
+       ↓
+  ┌────┴────────┬──────────┬──────────┐
+  HTML        JSON       YAML       SARIF
+```
+
+### Key Fields
+
+| Field             | Type                | Description                                         |
+| ----------------- | ------------------- | --------------------------------------------------- |
+| `reportVersion`   | `"2.0"`             | Report format version                               |
+| `engineVersion`   | `string`            | Engine version that generated the scan              |
+| `generatedAt`     | `string`            | ISO timestamp                                       |
+| `session`         | `object`            | Session metadata (name, driver, config, step count) |
+| `stats`           | `object`            | Execution stats (steps, payloads, duration, errors) |
+| `summary`         | `object`            | Aggregated overview (severity counts, risk, URLs)   |
+| `rules`           | `ReportRule[]`      | One rule per unique finding type, with CWE data     |
+| `findings`        | `EnrichedFinding[]` | All findings with CWE, fingerprints, classification |
+| `activeFindings`  | `EnrichedFinding[]` | Active scan findings only                           |
+| `passiveAnalysis` | `PassiveAnalysis`   | Structured passive check results by category        |
+
+### Enriched Findings
+
+Every finding is enriched with:
+
+- **`ruleId`** — e.g. `VULCN-XSS` (derived from finding type)
+- **`cwe`** — `{ id: 79, name: "Cross-site Scripting..." }` (from the CWE registry)
+- **`securitySeverity`** — CVSS-like score (0.0–10.0)
+- **`fingerprint`** — stable hash for deduplication across runs
+- **`detectionMethod`** — `"active"` or `"passive"`
+- **`passiveCategory`** — category ID when detection is passive
+
 ## SARIF Output
 
 The SARIF (Static Analysis Results Interchange Format) output is designed for CI/CD integration, producing reports compatible with:
@@ -133,7 +174,7 @@ The SARIF (Static Analysis Results Interchange Format) output is designed for CI
       "tool": {
         "driver": {
           "name": "Vulcn",
-          "version": "0.4.0",
+          "version": "0.6.0",
           "informationUri": "https://vulcn.dev",
           "rules": [
             {
@@ -181,6 +222,7 @@ The SARIF (Static Analysis Results Interchange Format) output is designed for CI
 | `path-traversal`    | `VULCN-PATH-TRAVERSAL`    | CWE-22  | 7.0 (High)        |
 | `open-redirect`     | `VULCN-OPEN-REDIRECT`     | CWE-601 | 4.0 (Medium)      |
 | `ssrf`              | `VULCN-SSRF`              | CWE-918 | 7.0 (High)        |
+| `reflection`        | `VULCN-REFLECTION`        | CWE-200 | 2.0 (Low)         |
 
 ## CI/CD Integration
 
@@ -210,7 +252,7 @@ jobs:
           node-version: "20"
 
       - name: Install Vulcn
-        run: npm install -g @vulcn/cli
+        run: npm install -g vulcn
 
       - name: Install browsers
         run: npx playwright install chromium --with-deps
@@ -269,7 +311,8 @@ The HTML report is designed as a modern security dashboard:
 - **📊 Risk Gauge** — Circular SVG gauge showing overall risk score (0–100)
 - **📈 Severity Breakdown** — Color-coded bars for Critical, High, Medium, Low, Info
 - **📋 Execution Summary** — Findings count, payloads tested, steps executed, URLs affected
-- **🃏 Expandable Findings** — Click to reveal description, payload (syntax-highlighted), evidence, and metadata
+- **🔒 Passive Analysis** — Grouped passive findings by category (Security Headers, Cookie Security, CORS, etc.) with remediation guidance
+- **🃏 Expandable Findings** — Click to reveal description, payload, evidence, CWE reference, and metadata
 - **⚠️ Errors Section** — Execution errors and timeouts
 - **🖨️ Print-Friendly** — All details auto-expand for PDF export (Cmd+P / Ctrl+P)
 - **🌙 Dark Theme** — Ambient gradient background with Inter + JetBrains Mono typography
@@ -279,19 +322,30 @@ The HTML report is designed as a modern security dashboard:
 ```json
 {
   "vulcn": {
-    "version": "0.4.0",
+    "version": "0.6.0",
+    "reportVersion": "2.0",
     "generatedAt": "2026-02-08T00:00:00Z"
   },
   "session": {
     "name": "Login Flow Test",
     "driver": "browser",
-    "targetUrl": "https://example.com",
+    "driverConfig": {
+      "startUrl": "https://example.com",
+      "browser": "chromium"
+    },
     "stepsCount": 6
   },
+  "execution": {
+    "stepsExecuted": 6,
+    "payloadsTested": 42,
+    "durationMs": 15230,
+    "durationFormatted": "15.2s",
+    "errors": []
+  },
   "summary": {
-    "riskScore": 75,
-    "riskLevel": "high",
     "totalFindings": 4,
+    "riskScore": 75,
+    "riskLabel": "High",
     "severityCounts": {
       "critical": 1,
       "high": 2,
@@ -299,15 +353,8 @@ The HTML report is designed as a modern security dashboard:
       "low": 0,
       "info": 0
     },
-    "uniqueVulnTypes": ["xss", "reflection"],
+    "vulnerabilityTypes": ["xss", "reflection"],
     "affectedUrls": ["https://example.com/search"]
-  },
-  "execution": {
-    "stepsExecuted": 6,
-    "payloadsTested": 42,
-    "duration": 15230,
-    "durationFormatted": "15.2s",
-    "errors": []
   },
   "findings": [
     {
@@ -319,9 +366,35 @@ The HTML report is designed as a modern security dashboard:
       "payload": "<script>alert('XSS')</script>",
       "url": "https://example.com/search",
       "evidence": "Dialog type: alert",
-      "metadata": {
-        "detectionMethod": "dialog"
+      "ruleId": "VULCN-XSS",
+      "cwe": { "id": 79, "name": "Cross-site Scripting" },
+      "securitySeverity": "9.0",
+      "fingerprint": "xss:step_005:<script>alert('XSS')</script>",
+      "detectionMethod": "active"
+    }
+  ],
+  "passiveAnalysis": {
+    "totalIssues": 2,
+    "categories": [
+      {
+        "id": "security-headers",
+        "label": "Security Headers",
+        "status": "warn",
+        "issueCount": 2,
+        "passedChecks": 4,
+        "totalChecks": 6,
+        "remedy": "Add the recommended security headers to your server configuration."
       }
+    ]
+  },
+  "rules": [
+    {
+      "id": "VULCN-XSS",
+      "type": "xss",
+      "cwe": { "id": 79, "name": "Cross-site Scripting" },
+      "severity": "critical",
+      "securitySeverity": "9.0",
+      "description": "Vulcn detected a potential xss vulnerability."
     }
   ]
 }
@@ -331,23 +404,28 @@ The HTML report is designed as a modern security dashboard:
 
 ```typescript
 import {
+  buildReport,
   generateHtml,
   generateJson,
-  generateYaml,
   generateSarif,
 } from "@vulcn/plugin-report";
+import type { VulcnReport } from "@vulcn/plugin-report";
 
-// HTML report
-const html = generateHtml({ session, result, generatedAt, engineVersion });
+// Build the canonical model from raw scan output
+const report: VulcnReport = buildReport(
+  session,
+  result,
+  new Date().toISOString(),
+  "0.6.0",
+);
 
-// JSON report
-const json = generateJson(session, result, generatedAt, engineVersion);
+// Generate any format from the model
+const html = generateHtml(report);
+const json = generateJson(report);
+const sarif = generateSarif(report);
 
-// YAML report
-const yaml = generateYaml(session, result, generatedAt, engineVersion);
-
-// SARIF report
-const sarif = generateSarif(session, result, generatedAt, engineVersion);
+await writeFile("vulcn-report.html", html);
+await writeFile("vulcn-report.json", JSON.stringify(json, null, 2));
 await writeFile("vulcn-report.sarif", JSON.stringify(sarif, null, 2));
 ```
 

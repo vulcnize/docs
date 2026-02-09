@@ -1,11 +1,19 @@
 ---
 title: "Browser Driver"
-description: "Record and replay web application interactions using Playwright"
+description: "Record, crawl, and replay web application interactions using Playwright"
 ---
 
 ## Overview
 
 The browser driver (`@vulcn/driver-browser`) enables security testing of web applications by recording and replaying browser interactions. It uses [Playwright](https://playwright.dev) for browser automation.
+
+**Key capabilities:**
+
+- **Record** browser interactions (clicks, form fills, navigation)
+- **Crawl** to auto-discover forms and injection points
+- **Replay** sessions with security payloads using persistent browser + goBack() cycling
+- **Tier 1 HTTP fast scan** — replay captured requests via `fetch()` at ~50ms/payload
+- **Authenticated scanning** — login detection, credential storage, session expiry handling
 
 ## Installation
 
@@ -84,7 +92,7 @@ Type into a form field. This is the primary injection point for payloads.
 
 <Info>
   Set `injectable: true` on input steps to mark them as payload injection
-  points. During replay, Vulcn will inject security payloads into these fields.
+  points. During replay, Vulcn injects security payloads into these fields.
 </Info>
 
 ### `browser.keypress`
@@ -146,9 +154,86 @@ vulcn install chromium
 vulcn install --all
 ```
 
+## Persistent Browser & Payload Cycling
+
+The browser driver uses a **persistent browser** strategy for speed:
+
+1. **One browser for the entire scan** — instead of launching a new browser per session, a single browser instance is reused across all sessions in a scan
+2. **goBack() payload cycling** — after a form submission causes navigation, `goBack()` returns to the form page much faster than a full `page.goto()`, especially for SPAs where the DOM is cached
+3. **Interleaved payloads** — round-robin across categories (XSS, SQLi, etc.) ensures at least one payload from each category is tested quickly, so dedup-based early-break fires sooner
+
+This means scanning 100 payloads against a form takes seconds instead of minutes.
+
+<Info>
+  The persistent browser is managed automatically by `executeScan()`. When
+  running a single session via `execute()`, the driver launches and closes its
+  own browser (backward-compatible standalone mode).
+</Info>
+
+## Tiered Scanning
+
+The browser driver supports **two scanning tiers**:
+
+### Tier 1: HTTP Fast Scan (~50ms/payload)
+
+During crawl, Vulcn captures HTTP request metadata (`CapturedRequest`) for each discovered form. The HTTP scanner replays these via Node.js `fetch()`:
+
+1. Substitutes payload into the injectable field
+2. Sends the HTTP request
+3. Checks response body for reflection patterns
+4. If reflected → marks finding as `needsBrowserConfirmation`
+
+**What it catches:** Reflected XSS, error-based SQLi, server-side reflection
+
+**What it misses:** DOM-based XSS, client-side state bugs, CSP-blocked attacks
+
+### Tier 2: Browser Replay (~2-5s/payload)
+
+Full Playwright-based replay — navigates to the page, fills the form, submits, and monitors for actual JavaScript execution (dialogs, console markers).
+
+**What it catches:** Everything Tier 1 catches + DOM-based XSS, client-side execution proof
+
+<Tip>
+  Tier 1 findings are tagged with `metadata.detectionMethod: "tier1-http"` and
+  `metadata.needsBrowserConfirmation: true` so you can distinguish them from
+  browser-confirmed findings in reports.
+</Tip>
+
+### Programmatic Tier 1 Usage
+
+```typescript
+import { httpScan, buildCapturedRequests } from "@vulcn/driver-browser";
+import type { CapturedRequest } from "@vulcn/engine";
+
+// Build requests from discovered forms
+const requests: CapturedRequest[] = buildCapturedRequests([
+  {
+    pageUrl: "https://example.com/search",
+    action: "/search",
+    method: "GET",
+    inputs: [{ name: "q", injectable: true, type: "text" }],
+    sessionName: "search-form",
+  },
+]);
+
+// Run HTTP-level scan
+const result = await httpScan(requests, payloads, {
+  timeout: 10_000,
+  concurrency: 10,
+  cookies: "session=abc123", // For authenticated scanning
+  onProgress: (completed, total) => {
+    console.log(`${completed}/${total}`);
+  },
+});
+
+console.log(`Sent ${result.requestsSent} requests in ${result.duration}ms`);
+console.log(`Found ${result.findings.length} reflections`);
+console.log(`${result.reflectedRequests.length} need browser confirmation`);
+```
+
 ## Auto-Crawl
 
-The browser driver supports **auto-crawl** — an automated mode that discovers forms, inputs, and injection points without manual recording. Think of it as a lightweight spider that generates sessions for you.
+The browser driver supports **auto-crawl** — an automated mode that discovers forms, inputs, and injection points without manual recording.
 
 ### How it Works
 
@@ -158,6 +243,7 @@ The browser driver supports **auto-crawl** — an automated mode that discovers 
 4. Finds submit triggers (submit buttons, untyped buttons, or falls back to Enter keypress)
 5. Follows same-origin links with configurable depth (BFS traversal)
 6. Generates a `Session` per discovered form with `navigate → input → submit` steps
+7. Captures `CapturedRequest` metadata for each form (for Tier 1 HTTP scanning)
 
 ### Configuration
 
@@ -210,24 +296,81 @@ for (const session of sessions) {
 }
 ```
 
-### Direct Access
+### Direct Access (with CapturedRequests)
 
-You can also use the crawler directly without going through the engine:
+Use the crawler directly to get both sessions and HTTP request metadata:
 
 ```typescript
 import { crawlAndBuildSessions } from "@vulcn/driver-browser";
 
-const sessions = await crawlAndBuildSessions(
+const { sessions, capturedRequests } = await crawlAndBuildSessions(
   { startUrl: "https://example.com", headless: true },
   { maxDepth: 1, maxPages: 5 },
+);
+
+console.log(
+  `${sessions.length} sessions, ${capturedRequests.length} HTTP requests`,
 );
 ```
 
 <Note>
-  Auto-crawl generates sessions with `injectable: true` on all discovered text
-  inputs. During replay, Vulcn injects payloads into these fields and triggers
-  the form submission.
+  `crawlAndBuildSessions()` returns a `CrawlResult` with both `sessions` (for
+  Tier 2 browser replay) and `capturedRequests` (for Tier 1 HTTP scanning).
 </Note>
+
+## Authentication
+
+The browser driver includes a full authentication system:
+
+### Login Form Auto-Detection
+
+```typescript
+import { detectLoginForm, performLogin } from "@vulcn/driver-browser";
+
+// Auto-detect login form on a page
+const loginForm = await detectLoginForm(page);
+// Returns: { usernameSelector, passwordSelector, submitSelector, formSelector }
+
+// Perform login with detected form
+const result = await performLogin(page, {
+  username: "admin",
+  password: "password",
+  loginForm,
+});
+// Returns: { success, storageState }
+```
+
+### Session Expiry Detection
+
+```typescript
+import { checkSessionAlive } from "@vulcn/driver-browser";
+
+const alive = await checkSessionAlive(page, {
+  loggedInIndicator: "Welcome",
+  loggedOutIndicator: "Login",
+  sessionExpiry: {
+    statusCodes: [401, 403],
+    redirectPattern: "/login",
+  },
+});
+
+if (!alive) {
+  // Re-authenticate...
+}
+```
+
+### CLI Workflow
+
+```bash
+# 1. Store credentials (AES-256-GCM encrypted)
+vulcn store admin password --login-url http://localhost:8080/login.php
+
+# 2. Crawl with authentication
+vulcn crawl http://localhost:8080 --creds .vulcn/auth.enc
+
+# 3. Scan with authentication
+vulcn run sessions/form.vulcn.yml --creds .vulcn/auth.enc -p xss -r html
+```
 
 ## Programmatic Usage
 
@@ -280,19 +423,40 @@ During replay, the browser driver monitors for:
 
 - **JavaScript Dialogs** - `alert()`, `confirm()`, `prompt()` triggered by payloads
 - **Console Messages** - `console.log()` outputs matching payload markers
-- **Payload Reflection** - Payload strings appearing in page content
+- **Payload Reflection** - Payload strings appearing in page content (Tier 2)
+- **HTTP Reflection** - Payload patterns in HTTP response bodies (Tier 1)
 
 These detections are enhanced when combined with detection plugins:
 
 ```yaml
 plugins:
   - name: "@vulcn/plugin-detect-xss"
+  - name: "@vulcn/plugin-detect-sqli"
   - name: "@vulcn/plugin-detect-reflection"
 ```
 
-## Example Session
+## Session Formats
 
-Complete recorded session example:
+### v2 Session Directory (recommended)
+
+The v2 format uses a `.vulcn/` directory with a manifest:
+
+```
+my-scan.vulcn/
+├── manifest.yml          # Scan config, session list, auth config
+├── auth/
+│   ├── config.yml        # Login strategy, indicators
+│   └── state.enc         # Encrypted storageState
+├── sessions/
+│   ├── search-form.yml   # Individual session file
+│   └── login-form.yml
+└── requests/
+    └── search-form.json  # HTTP metadata for Tier 1 scanning
+```
+
+### v1 Session File (legacy)
+
+Single YAML file containing everything:
 
 ```yaml
 name: Login Form Test
@@ -317,20 +481,13 @@ steps:
     timestamp: 1200
 
   - id: step_003
-    type: browser.input
-    selector: "#password"
-    value: password123
-    injectable: true
-    timestamp: 2400
-
-  - id: step_004
     type: browser.click
     selector: button[type="submit"]
     timestamp: 3000
 
 metadata:
   recordedAt: "2026-02-06T12:00:00Z"
-  version: "1"
+  version: "2"
 ```
 
 <Card title="Plugin System" icon="plug" href="/plugins/overview">

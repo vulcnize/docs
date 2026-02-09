@@ -20,17 +20,18 @@ vulcn crawl <url> [options]
 
 ## Options
 
-| Option                      | Description                                    | Default      |
-| --------------------------- | ---------------------------------------------- | ------------ |
-| `-o, --output <dir>`        | Output directory for session files             | `./sessions` |
-| `-d, --depth <n>`           | Maximum crawl depth                            | `2`          |
-| `-m, --max-pages <n>`       | Maximum pages to visit                         | `20`         |
-| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)     | `chromium`   |
-| `--headless`                | Run in headless mode                           | `true`       |
-| `--no-headless`             | Run with visible browser                       | -            |
-| `-t, --timeout <ms>`        | Page timeout in milliseconds                   | `10000`      |
-| `--no-same-origin`          | Allow following cross-origin links             | -            |
-| `--run-after <payloads...>` | Auto-run scans after crawl with these payloads | -            |
+| Option                      | Description                                    | Default           |
+| --------------------------- | ---------------------------------------------- | ----------------- |
+| `-o, --output <dir>`        | Output directory for session files             | `./sessions`      |
+| `-d, --depth <n>`           | Maximum crawl depth                            | `2`               |
+| `-m, --max-pages <n>`       | Maximum pages to visit                         | `20`              |
+| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)     | `chromium`        |
+| `--headless`                | Run in headless mode                           | `true`            |
+| `--no-headless`             | Run with visible browser                       | -                 |
+| `-t, --timeout <ms>`        | Page timeout in milliseconds                   | `10000`           |
+| `--no-same-origin`          | Allow following cross-origin links             | -                 |
+| `--run-after <payloads...>` | Auto-run scans after crawl with these payloads | -                 |
+| `--creds <file>`            | Credentials file for authenticated crawling    | `.vulcn/auth.enc` |
 
 ## Description
 
@@ -44,7 +45,15 @@ This is essential for **automated benchmarking** — point it at a target, let i
 2. Follows links up to `--depth` levels deep (BFS)
 3. Identifies forms and standalone inputs on each page
 4. Generates a `.vulcn.yml` session file per form with all injectable inputs marked
-5. Optionally chains into `vulcn run` with `--run-after`
+5. Captures `CapturedRequest` HTTP metadata for each form (used by Tier 1 HTTP fast scan)
+6. Optionally chains into `vulcn run` with `--run-after`
+
+<Info>
+  The `CapturedRequest` metadata enables Tier 1 scanning — HTTP-level payload
+  testing via `fetch()` at ~50ms/payload. This runs automatically when you
+  `vulcn run` a crawled session. See [Browser Driver](/drivers/browser) for
+  details.
+</Info>
 
 ## Examples
 
@@ -78,11 +87,39 @@ vulcn crawl https://example.com --run-after xss sqli
 
 Crawls the site, then automatically runs XSS and SQL injection tests on every discovered form.
 
+### Authenticated Crawl
+
+Crawl pages behind login using stored credentials:
+
+```bash
+# First store credentials
+vulcn store admin password --login-url https://app.example.com/login
+
+# Then crawl with authentication
+vulcn crawl https://app.example.com --creds .vulcn/auth.enc
+```
+
+When `--creds` is provided, Vulcn will:
+
+1. Decrypt the credentials file using `VULCN_KEY` or an interactive prompt
+2. Launch a browser and navigate to the login URL
+3. Auto-detect the login form and fill credentials
+4. Capture the browser's storage state (cookies + localStorage)
+5. Use the authenticated context for crawling
+
+This allows the crawler to discover forms and inputs on pages that require authentication.
+
 ### Benchmarking Against DVWA
 
 ```bash
-docker run -d -p 80:80 vulnerables/web-dvwa
-vulcn crawl http://localhost -d 3 --run-after xss sqli -r html
+# Start DVWA
+docker run -d -p 8080:80 vulnerables/web-dvwa
+
+# Store DVWA credentials
+vulcn store admin password --login-url http://localhost:8080/login.php
+
+# Authenticated crawl + scan
+vulcn crawl http://localhost:8080 --creds .vulcn/auth.enc --run-after xss sqli
 ```
 
 <Tip>
@@ -138,5 +175,6 @@ steps:
 
 ## See Also
 
+- [vulcn store](/cli/store) — Store credentials for authenticated crawling
 - [vulcn run](/cli/run) — Run security tests on generated sessions
 - [vulcn record](/cli/record) — Manually record browser interactions

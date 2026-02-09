@@ -10,12 +10,13 @@ description: "Available hooks for Vulcn plugins"
 
 Vulcn provides hooks for different lifecycle phases:
 
-| Category           | Hooks                                                         | When Called              |
-| ------------------ | ------------------------------------------------------------- | ------------------------ |
-| **Initialization** | `onInit`, `onDestroy`                                         | Plugin setup/teardown    |
-| **Recording**      | `onRecordStart`, `onRecordStep`, `onRecordEnd`                | During session recording |
-| **Running**        | `onRunStart`, `onBeforePayload`, `onAfterPayload`, `onRunEnd` | During test execution    |
-| **Browser Events** | `onDialog`, `onConsoleMessage`, `onPageLoad`                  | Browser activity         |
+| Category           | Hooks                                                                          | When Called                        |
+| ------------------ | ------------------------------------------------------------------------------ | ---------------------------------- |
+| **Initialization** | `onInit`, `onDestroy`                                                          | Plugin setup/teardown              |
+| **Recording**      | `onRecordStart`, `onRecordStep`, `onRecordEnd`                                 | During session recording           |
+| **Scanning**       | `onScanStart`, `onScanEnd`                                                     | Once per scan (wraps all sessions) |
+| **Running**        | `onRunStart`, `onBeforePayload`, `onAfterPayload`, `onBeforeClose`, `onRunEnd` | Per session execution              |
+| **Browser Events** | `onDialog`, `onConsoleMessage`, `onPageLoad`                                   | Browser activity                   |
 
 ## Initialization Hooks
 
@@ -95,6 +96,80 @@ Called when recording ends. Can modify the final session.
 ```typescript
 onRecordEnd?: (session: Session, ctx: RecordContext) => Promise<Session>;
 ```
+
+## Scan-Level Hooks
+
+Scan-level hooks fire **once per scan**, wrapping all session executions. They are called by `executeScan()` when running multiple sessions with a shared browser.
+
+### onScanStart
+
+Called once before any session is executed.
+
+```typescript
+onScanStart?: (ctx: ScanContext) => Promise<void>;
+```
+
+**Context includes:**
+
+- `sessions` — All sessions in this scan
+- `sessionCount` — Total number of sessions
+- `headless` — Whether running headless
+
+**Use cases:**
+
+- Initialize scan-wide state (e.g., shared metrics, timers)
+- Log scan scope for auditing
+- Set up external integrations (e.g., Jira tickets, Slack notifications)
+
+**Example:**
+
+```typescript
+onScanStart: async (ctx) => {
+  ctx.logger.info(`Starting scan of ${ctx.sessionCount} sessions`);
+  ctx.logger.info(`Sessions: ${ctx.sessions.map((s) => s.name).join(", ")}`);
+};
+```
+
+### onScanEnd
+
+Called once after all sessions have executed. Can transform the aggregate result.
+
+```typescript
+onScanEnd?: (result: RunResult, ctx: ScanContext) => Promise<RunResult>;
+```
+
+**Use cases:**
+
+- Generate scan-wide aggregated reports
+- Deduplicate findings across sessions
+- Send summary to external services
+- Calculate aggregate risk scores
+
+**Example — Deduplicate findings:**
+
+```typescript
+onScanEnd: async (result, ctx) => {
+  const seen = new Set<string>();
+  const deduped = result.findings.filter((f) => {
+    const key = `${f.type}:${f.url}:${f.payload}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  ctx.logger.info(
+    `Deduplicated ${result.findings.length} → ${deduped.length} findings`,
+  );
+
+  return { ...result, findings: deduped };
+};
+```
+
+<Tip>
+  Scan-level hooks are only called when using `executeScan()` (multi-session
+  mode). If you run a single session with `execute()`, only the per-session
+  hooks (`onRunStart`/`onRunEnd`) fire.
+</Tip>
 
 ## Running Hooks
 
@@ -185,6 +260,38 @@ onRunEnd: async (result, ctx) => {
   docs](/plugins/plugin-report) for details.
 </Tip>
 
+### onBeforeClose
+
+Called before the browser/driver is closed. Plugins should await any pending async work here.
+
+```typescript
+onBeforeClose?: (ctx: PluginContext) => Promise<void>;
+```
+
+**Use cases:**
+
+- Flush in-flight async response handlers (e.g., passive scanner)
+- Save accumulated state before browser teardown
+- Clean up page-level event listeners
+
+**Example — Drain pending work:**
+
+```typescript
+const pendingHandlers: Promise<void>[] = [];
+
+// In onRunStart:
+page.on("response", (response) => {
+  const promise = analyzeResponse(response);
+  pendingHandlers.push(promise);
+});
+
+// In onBeforeClose:
+onBeforeClose: async () => {
+  await Promise.allSettled(pendingHandlers);
+  pendingHandlers.length = 0;
+};
+```
+
 ## Browser Event Hooks
 
 ### onDialog
@@ -249,11 +356,18 @@ interface PluginContext {
   config: Record<string, unknown>; // Plugin config
   engine: EngineInfo; // Engine version info
   payloads: RuntimePayload[]; // Available payloads
-  findings: Finding[]; // Collected findings
+  findings: Finding[]; // Collected findings (read-only view)
+  addFinding: (finding: Finding) => void; // Add finding via callback chain
   logger: PluginLogger; // Scoped logger
   fetch: typeof fetch; // Fetch API
 }
 ```
+
+<Warning>
+  Always use `ctx.addFinding()` to report findings instead of pushing to
+  `ctx.findings` directly. This ensures consumers are notified via the
+  `onFinding` callback and findings survive timeouts.
+</Warning>
 
 ### RecordContext
 
@@ -290,5 +404,17 @@ interface DetectContext extends RunContext {
   payloadSet: RuntimePayload;
   payloadValue: string; // Actual payload
   stepId: string; // Step identifier
+}
+```
+
+### ScanContext
+
+Extended context for scan-level hooks:
+
+```typescript
+interface ScanContext extends PluginContext {
+  sessions: Session[]; // All sessions in the scan
+  headless: boolean; // Whether running headless
+  sessionCount: number; // Total sessions
 }
 ```

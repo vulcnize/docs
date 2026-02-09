@@ -13,9 +13,10 @@ description: "Modern, fast penetration testing framework. Record once, replay wi
 Vulcn is a **modern, fast penetration testing framework** designed for developers and security engineers who want to find vulnerabilities without the complexity of legacy tools. Instead of manually testing each input, Vulcn lets you:
 
 1. **Record** interactions once (browser clicks, form submissions, navigation)
-2. **Replay** sessions with security payloads injected into every input
-3. **Detect** real vulnerabilities via execution-based detection (not just pattern matching)
-4. **Report** findings with branded HTML dashboards, SARIF for GitHub Code Scanning, JSON for CI/CD, or YAML
+2. **Crawl** to auto-discover forms with optional authenticated crawling
+3. **Replay** sessions with tiered scanning — Tier 1 HTTP fast scan + Tier 2 browser replay
+4. **Detect** real vulnerabilities via execution-based detection (not just pattern matching)
+5. **Report** findings with branded HTML dashboards, SARIF for GitHub Code Scanning, JSON for CI/CD, or YAML
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
@@ -36,8 +37,9 @@ Vulcn is a **modern, fast penetration testing framework** designed for developer
 
 <CardGroup cols={3}>
   <Card title="⚡ Fast" icon="bolt">
-    Lightweight CLI that starts in milliseconds. No JVM, no desktop app, no
-    proxy setup—just `npm install -g vulcn` and go.
+    Tiered scanning: Tier 1 HTTP fast scan tests ~50ms/payload via `fetch()`,
+    Tier 2 browser replay confirms findings. No JVM, no desktop app—just `npm
+    install -g vulcn` and go.
   </Card>
   <Card title="🔌 Pluggable" icon="plug">
     Modular driver and plugin architecture. Add detection, payloads, and
@@ -47,16 +49,22 @@ Vulcn is a **modern, fast penetration testing framework** designed for developer
     Execution-based detection verifies real JavaScript execution—when `alert()`
     fires, you know the XSS is confirmed, not just a guess.
   </Card>
+  <Card title="🔒 Authenticated" icon="lock">
+    Login form auto-detection, AES-256-GCM credential encryption, session expiry
+    detection with auto re-auth. Scan pages behind login.
+  </Card>
 </CardGroup>
 
 ## Architecture
 
-Vulcn v0.3.0 uses a modular architecture with **drivers** for different targets and **plugins** for detection and reporting:
+Vulcn v0.7.0 uses a modular architecture with **drivers** for different targets and **plugins** for detection and reporting:
 
 ```mermaid
 flowchart TB
     subgraph CLI["vulcn CLI"]
         Record[vulcn record]
+        Crawl[vulcn crawl]
+        Store[vulcn store]
         Run[vulcn run]
     end
 
@@ -67,26 +75,32 @@ flowchart TB
 
     subgraph Drivers
         Browser["@vulcn/driver-browser"]
-        API["@vulcn/driver-api"]
-        CLID["@vulcn/driver-cli"]
+        HttpScan["HTTP Scanner (Tier 1)"]
+        BrowserReplay["Browser Replay (Tier 2)"]
     end
 
     subgraph Plugins
         Payloads["plugin-payloads"]
         XSS["plugin-detect-xss"]
+        SQLi["plugin-detect-sqli"]
         Reflect["plugin-detect-reflection"]
+        Passive["plugin-passive"]
         Report["plugin-report"]
     end
 
     Record --> DM
+    Crawl --> DM
+    Store --> DM
     Run --> DM
     Run --> PM
     DM --> Browser
-    DM --> API
-    DM --> CLID
+    Browser --> HttpScan
+    Browser --> BrowserReplay
     PM --> Payloads
     PM --> XSS
+    PM --> SQLi
     PM --> Reflect
+    PM --> Passive
     PM --> Report
 ```
 
@@ -142,17 +156,19 @@ flowchart TB
 ## How It Works
 
 <Steps>
-  <Step title="Record a Session">
-    Choose a driver (browser, api, cli) and record your interactions. Vulcn
-    captures every action as a replayable session.
+  <Step title="Record or Crawl">
+    Record browser interactions manually, or use `vulcn crawl` to auto-discover
+    forms. For authenticated apps, `vulcn store` encrypts credentials and
+    `--creds` enables login-then-crawl.
   </Step>
   <Step title="Choose Payloads">
     Select from community-curated payload types (xss, sqli, xxe, cmd, redirect,
     traversal), or load custom ones from files.
   </Step>
-  <Step title="Run Tests">
-    Vulcn replays your session, injecting each payload into every input field
-    and monitoring for vulnerabilities via execution-based detection.
+  <Step title="Run Tests (Tiered)">
+    **Tier 1:** HTTP fast scan replays requests via `fetch()` at ~50ms/payload,
+    detecting reflected content. **Tier 2:** Browser replay confirms findings
+    with real JavaScript execution monitoring.
   </Step>
   <Step title="Review Reports">
     Get detailed HTML dashboards, SARIF for GitHub Code Scanning, JSON for CI/CD

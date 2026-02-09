@@ -233,7 +233,7 @@ for (const session of sessions) {
 
 ### execute
 
-Execute a session with payloads.
+Execute a single session with payloads (standalone mode — launches its own browser).
 
 ```typescript
 async execute(
@@ -261,6 +261,53 @@ const result = await manager.execute(session, pluginManager, {
 
 console.log(`Found ${result.findings.length} vulnerabilities`);
 ```
+
+### executeScan
+
+Execute multiple sessions in a single scan with a **persistent browser** instance. This is the recommended method for production scanning — it's faster (shared browser, goBack-based payload cycling) and fires scan-level plugin hooks (`onScanStart`, `onScanEnd`).
+
+```typescript
+async executeScan(
+  sessions: Session[],
+  pluginManager: PluginManager,
+  options?: RunOptions
+): Promise<RunResult>
+```
+
+**Parameters:**
+
+- `sessions` - Array of sessions to execute
+- `pluginManager` - Plugin manager with payloads loaded
+- `options` - Run options (headless, callbacks, storage state, etc.)
+
+**Returns:** Aggregated `RunResult` with findings from all sessions.
+
+**Example:**
+
+```typescript
+// Crawl to discover forms
+const sessions = await manager.crawl("browser", {
+  startUrl: "https://example.com",
+  headless: true,
+});
+
+// Scan all sessions with a shared browser
+const result = await manager.executeScan(sessions, pluginManager, {
+  headless: true,
+  onFinding: (finding) => console.log(`🚨 ${finding.title}`),
+});
+
+console.log(`Scanned ${sessions.length} forms`);
+console.log(
+  `Found ${result.findings.length} vulnerabilities in ${result.duration}ms`,
+);
+```
+
+<Info>
+  `executeScan()` fires `onScanStart` and `onScanEnd` hooks (wrapping all
+  sessions), plus `onRunStart`/`onRunEnd` for each individual session. Use
+  `execute()` only when you need to test a single session in isolation.
+</Info>
 
 ## Types
 

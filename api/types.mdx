@@ -12,14 +12,21 @@ interface Session {
   /** Session name */
   name: string;
 
-  /** Starting URL */
-  startUrl: string;
+  /** Driver used for recording/replay */
+  driver: string;
 
-  /** Browser used for recording */
-  browser: BrowserType;
+  /** Driver-specific configuration */
+  driverConfig: Record<string, unknown>;
 
   /** Recorded steps */
   steps: Step[];
+
+  /** Session metadata */
+  metadata?: {
+    recordedAt?: string;
+    version?: string;
+    [key: string]: unknown;
+  };
 }
 ```
 
@@ -30,8 +37,8 @@ interface Step {
   /** Unique step ID */
   id: string;
 
-  /** Step type */
-  type: StepType;
+  /** Step type (driver-prefixed, e.g. "browser.input") */
+  type: string;
 
   /** Timestamp when step was recorded */
   timestamp: number;
@@ -42,11 +49,15 @@ interface Step {
   /** CSS selector for interaction steps */
   selector?: string;
 
-  /** Value for fill/select steps */
+  /** Value for input steps */
   value?: string;
-}
 
-type StepType = "navigate" | "click" | "fill" | "select" | "check";
+  /** Whether this field should receive payloads */
+  injectable?: boolean;
+
+  /** Additional driver-specific properties */
+  [key: string]: unknown;
+}
 ```
 
 ### BrowserType
@@ -195,11 +206,20 @@ interface VulcnPlugin {
 
 ```typescript
 interface PluginHooks {
+  // Initialization
   onInit?: (ctx: PluginContext) => Promise<void>;
   onDestroy?: (ctx: PluginContext) => Promise<void>;
+
+  // Recording
   onRecordStart?: (ctx: RecordContext) => Promise<void>;
   onRecordStep?: (step: Step, ctx: RecordContext) => Promise<Step | null>;
   onRecordEnd?: (session: Session, ctx: RecordContext) => Promise<Session>;
+
+  // Scan-level (wraps all sessions)
+  onScanStart?: (ctx: ScanContext) => Promise<void>;
+  onScanEnd?: (result: RunResult, ctx: ScanContext) => Promise<RunResult>;
+
+  // Per-session
   onRunStart?: (ctx: RunContext) => Promise<void>;
   onBeforePayload?: (
     payload: string,
@@ -207,7 +227,10 @@ interface PluginHooks {
     ctx: RunContext,
   ) => Promise<string>;
   onAfterPayload?: (ctx: DetectContext) => Promise<Finding[]>;
+  onBeforeClose?: (ctx: PluginContext) => Promise<void>;
   onRunEnd?: (result: RunResult, ctx: RunContext) => Promise<RunResult>;
+
+  // Browser events
   onDialog?: (dialog: Dialog, ctx: DetectContext) => Promise<Finding | null>;
   onConsoleMessage?: (
     msg: ConsoleMessage,
@@ -227,6 +250,7 @@ interface PluginContext {
   engine: EngineInfo;
   payloads: RuntimePayload[];
   findings: Finding[];
+  addFinding: (finding: Finding) => void;
   logger: PluginLogger;
   fetch: typeof fetch;
 }
@@ -276,6 +300,21 @@ interface DetectContext extends RunContext {
 }
 ```
 
+### ScanContext
+
+```typescript
+interface ScanContext extends PluginContext {
+  /** All sessions in this scan */
+  sessions: Session[];
+
+  /** Whether running headless */
+  headless: boolean;
+
+  /** Total sessions count */
+  sessionCount: number;
+}
+```
+
 ## Options Types
 
 ### RecorderOptions
@@ -317,5 +356,230 @@ interface PluginConfig {
   name: string;
   config?: Record<string, unknown>;
   enabled?: boolean;
+}
+```
+
+## Auth Types
+
+### Credentials
+
+```typescript
+type Credentials = FormCredentials | HeaderCredentials;
+
+interface FormCredentials {
+  type: "form";
+  username: string;
+  password: string;
+  loginUrl?: string;
+  usernameSelector?: string;
+  passwordSelector?: string;
+}
+
+interface HeaderCredentials {
+  type: "header";
+  headerName: string;
+  headerValue: string;
+}
+```
+
+### AuthConfig
+
+```typescript
+interface AuthConfig {
+  strategy: "storage-state" | "header";
+  loginUrl?: string;
+  loggedInIndicator?: string;
+  loggedOutIndicator?: string;
+  sessionExpiry?: {
+    statusCodes?: number[];
+    redirectPattern?: string;
+    pageContent?: string;
+  };
+}
+```
+
+### Encryption Functions
+
+```typescript
+/** Encrypt credentials with AES-256-GCM */
+function encryptCredentials(
+  credentials: Credentials,
+  passphrase: string,
+): string;
+
+/** Decrypt credentials */
+function decryptCredentials(encrypted: string, passphrase: string): Credentials;
+
+/** Encrypt Playwright storage state */
+function encryptStorageState(state: string, passphrase: string): string;
+
+/** Decrypt storage state */
+function decryptStorageState(encrypted: string, passphrase: string): string;
+
+/** Get passphrase from VULCN_KEY env variable */
+function getPassphrase(): string;
+```
+
+## Crawl Types
+
+### CrawlOptions
+
+```typescript
+interface CrawlOptions {
+  /** Maximum crawl depth (default: 2) */
+  maxDepth?: number;
+
+  /** Maximum pages to visit (default: 20) */
+  maxPages?: number;
+
+  /** Timeout per page in ms (default: 10000) */
+  pageTimeout?: number;
+
+  /** Only crawl same origin (default: true) */
+  sameOrigin?: boolean;
+
+  /** Playwright storage state JSON for authenticated crawling */
+  storageState?: string;
+
+  /** Callback when a page is crawled */
+  onPageCrawled?: (url: string, formsFound: number) => void;
+}
+```
+
+## Session Directory Types
+
+### ScanManifest
+
+The v2 session directory format uses a manifest file:
+
+```typescript
+interface ScanManifest {
+  /** Config version */
+  version: string;
+
+  /** Target URL */
+  target: string;
+
+  /** Driver to use */
+  driver: string;
+
+  /** Driver config (browser, headless, viewport, etc.) */
+  driverConfig: Record<string, unknown>;
+
+  /** Session references */
+  sessions: SessionRef[];
+
+  /** Auth configuration */
+  auth?: AuthConfig;
+}
+
+interface SessionRef {
+  /** Session filename (relative to sessions/ dir) */
+  file: string;
+
+  /** Human-readable label */
+  label?: string;
+}
+```
+
+### CapturedRequest
+
+HTTP request metadata captured during crawling for Tier 1 scanning:
+
+```typescript
+interface CapturedRequest {
+  /** Request method (GET, POST, etc.) */
+  method: string;
+
+  /** Full URL */
+  url: string;
+
+  /** Request headers */
+  headers: Record<string, string>;
+
+  /** Form data (for POST) */
+  body?: string;
+
+  /** Content type (e.g. application/x-www-form-urlencoded) */
+  contentType?: string;
+
+  /** Which form field should receive payloads */
+  injectableField?: string;
+
+  /** Session name this request belongs to */
+  sessionName: string;
+}
+```
+
+### CrawlResult
+
+Return type of `crawlAndBuildSessions()`:
+
+```typescript
+interface CrawlResult {
+  /** Sessions for Tier 2 browser replay */
+  sessions: Session[];
+
+  /** HTTP request metadata for Tier 1 fast scan */
+  capturedRequests: CapturedRequest[];
+}
+```
+
+## HTTP Scan Types
+
+### HttpScanResult
+
+```typescript
+interface HttpScanResult {
+  /** Findings detected during HTTP scanning */
+  findings: Finding[];
+
+  /** Requests where payloads were reflected in responses */
+  reflectedRequests: ReflectedRequest[];
+
+  /** Total HTTP requests sent */
+  requestsSent: number;
+
+  /** Duration in milliseconds */
+  duration: number;
+}
+```
+
+### ReflectedRequest
+
+```typescript
+interface ReflectedRequest {
+  /** Original captured request */
+  request: CapturedRequest;
+
+  /** Payload that was reflected */
+  payload: string;
+
+  /** Payload category (xss, sqli, etc.) */
+  category: PayloadCategory;
+
+  /** HTTP response status code */
+  responseStatus: number;
+}
+```
+
+### HttpScanOptions
+
+```typescript
+interface HttpScanOptions {
+  /** Request timeout in ms (default: 10000) */
+  timeout?: number;
+
+  /** Max concurrent requests (default: 10) */
+  concurrency?: number;
+
+  /** Cookies to attach to requests */
+  cookies?: string;
+
+  /** Extra headers */
+  headers?: Record<string, string>;
+
+  /** Progress callback */
+  onProgress?: (completed: number, total: number) => void;
 }
 ```

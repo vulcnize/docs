@@ -53,6 +53,7 @@ interface PluginHooks {
     ctx: RunContext,
   ) => Promise<string>;
   onAfterPayload?: (ctx: DetectContext) => Promise<Finding[]>;
+  onBeforeClose?: (ctx: PluginContext) => Promise<void>;
   onRunEnd?: (result: RunResult, ctx: RunContext) => Promise<RunResult>;
 
   // Browser events
@@ -90,8 +91,11 @@ interface PluginContext {
   /** Shared payload registry */
   payloads: RuntimePayload[];
 
-  /** Shared findings collection */
+  /** Shared findings collection (read-only view) */
   findings: Finding[];
+
+  /** Add a finding through the proper callback chain */
+  addFinding: (finding: Finding) => void;
 
   /** Scoped logger */
   logger: PluginLogger;

@@ -22,6 +22,7 @@
             "pages": [
               "cli/overview",
               "cli/record",
+              "cli/store",
               "cli/crawl",
               "cli/run",
               "cli/payloads",
@@ -80,7 +81,9 @@
             "pages": [
               "api/overview",
               "api/driver-manager",
-              "api/plugin-manager"
+              "api/plugin-manager",
+              "api/recorder",
+              "api/runner"
             ]
           },
           {

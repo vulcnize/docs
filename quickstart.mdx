@@ -259,6 +259,50 @@ Usage:
   vulcn run session.yml -f custom-payloads.yml
 ```
 
+## Authenticated Scanning
+
+For applications behind login pages, Vulcn can perform authenticated crawling and scanning.
+
+<Steps>
+<Step title="Store credentials">
+
+```bash
+vulcn store admin password --login-url https://app.example.com/login
+```
+
+Credentials are encrypted with AES-256-GCM and saved to `.vulcn/auth.enc`. Set `VULCN_KEY` env var or enter a passphrase when prompted.
+
+</Step>
+
+<Step title="Crawl with authentication">
+
+```bash
+vulcn crawl https://app.example.com --creds .vulcn/auth.enc
+```
+
+Vulcn will decrypt credentials, perform a login, capture cookies/storage, and crawl all authenticated pages.
+
+</Step>
+
+<Step title="Scan with authentication">
+
+```bash
+vulcn run sessions/01-form.vulcn.yml --creds .vulcn/auth.enc -p xss sqli -r html
+```
+
+The scanner inherits the authenticated browser state, so it can test forms behind login.
+
+</Step>
+</Steps>
+
+<Tip>
+  For a hands-on demo, try the complete workflow against
+  [DVWA](https://github.com/digininja/DVWA): ```bash docker run -d -p 8080:80
+  vulnerables/web-dvwa vulcn store admin password --login-url
+  http://localhost:8080/login.php vulcn crawl http://localhost:8080 --creds
+  .vulcn/auth.enc --run-after xss ```
+</Tip>
+
 ## Next Steps
 
 <CardGroup cols={2}>

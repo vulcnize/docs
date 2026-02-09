@@ -25,6 +25,9 @@ vulcn [command] [options]
   <Card title="record" icon="circle-dot" href="/cli/record">
     Record browser interactions into a session file
   </Card>
+  <Card title="store" icon="lock" href="/cli/store">
+    Store encrypted credentials for authenticated scans
+  </Card>
   <Card title="crawl" icon="spider" href="/cli/crawl">
     Auto-discover forms and injection points
   </Card>
@@ -50,6 +53,7 @@ vulcn [command] [options]
 | Command                      | Description                    |
 | ---------------------------- | ------------------------------ |
 | `vulcn record <url>`         | Record browser interactions    |
+| `vulcn store [user] [pass]`  | Store encrypted credentials    |
 | `vulcn crawl <url>`          | Auto-discover forms and inputs |
 | `vulcn run <session>`        | Run security tests             |
 | `vulcn payloads`             | List available payload types   |
@@ -108,4 +112,17 @@ vulcn install --all
 
 # Use Firefox for recording
 vulcn record https://example.com --browser firefox
+```
+
+### Authenticated Scanning
+
+```bash
+# Store credentials for a target
+vulcn store admin password --login-url https://app.example.com/login
+
+# Crawl authenticated pages
+vulcn crawl https://app.example.com --creds .vulcn/auth.enc
+
+# Run authenticated scans
+vulcn run sessions/01-form.vulcn.yml --creds .vulcn/auth.enc -p xss sqli
 ```

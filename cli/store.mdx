@@ -1,0 +1,152 @@
+---
+title: "vulcn store"
+seo:
+  title: "vulcn store — Store Encrypted Credentials for Authenticated Scans"
+  description: "Securely store credentials for authenticated security scanning with Vulcn. Supports form-based login and header-based authentication using AES-256-GCM encryption."
+description: "Store encrypted credentials for authenticated security scanning"
+---
+
+## Usage
+
+```bash
+vulcn store [username] [password] [options]
+```
+
+## Arguments
+
+| Argument   | Description                            | Required |
+| ---------- | -------------------------------------- | -------- |
+| `username` | Username for form-based authentication | No\*     |
+| `password` | Password for form-based authentication | No\*     |
+
+\* Required for form-based auth. Omit both for header-based auth.
+
+## Options
+
+| Option                      | Description                                    | Default            |
+| --------------------------- | ---------------------------------------------- | ------------------ |
+| `--type <type>`             | Auth type: `form` or `header`                  | `form`             |
+| `--login-url <url>`         | Login page URL (for form auth)                 | -                  |
+| `--username-selector <css>` | CSS selector for username field                | Auto-detected      |
+| `--password-selector <css>` | CSS selector for password field                | Auto-detected      |
+| `--header-name <name>`      | Header name (for header auth)                  | `Authorization`    |
+| `--header-value <value>`    | Header value (for header auth)                 | -                  |
+| `-o, --output <file>`       | Output file path                               | `.vulcn/auth.enc`  |
+| `--passphrase <passphrase>` | Encryption passphrase (or set `VULCN_KEY` env) | Interactive prompt |
+
+## Description
+
+The `store` command securely encrypts authentication credentials using **AES-256-GCM** with PBKDF2 key derivation (600,000 iterations). The encrypted file can then be used with `vulcn crawl --creds` and `vulcn run --creds` for authenticated security scanning.
+
+## Encryption Details
+
+- **Algorithm:** AES-256-GCM (authenticated encryption)
+- **Key Derivation:** PBKDF2 with SHA-512, 600,000 iterations
+- **Salt:** 32 bytes, randomly generated per encryption
+- **IV:** 16 bytes, randomly generated per encryption
+- **Auth Tag:** 16 bytes (GCM integrity verification)
+
+The passphrase is resolved in this order:
+
+1. `--passphrase` flag
+2. Interactive terminal prompt (hidden input)
+3. `VULCN_KEY` environment variable
+
+## Examples
+
+### Form-Based Login (DVWA)
+
+```bash
+vulcn store admin password --login-url http://localhost:8080/login.php
+```
+
+When used with `vulcn crawl --creds`, Vulcn will:
+
+1. Navigate to the login URL
+2. Auto-detect username/password fields
+3. Fill the form and submit
+4. Capture browser cookies and storage state
+
+### Form-Based Login with Custom Selectors
+
+```bash
+vulcn store admin p@ssw0rd \
+  --login-url https://app.example.com/signin \
+  --username-selector '#email' \
+  --password-selector '#password'
+```
+
+### Header-Based Auth (API Token)
+
+```bash
+vulcn store --type header \
+  --header-name Authorization \
+  --header-value "Bearer eyJhbG..."
+```
+
+### Header-Based Auth (API Key)
+
+```bash
+vulcn store --type header \
+  --header-name X-API-Key \
+  --header-value "sk_live_abc123"
+```
+
+### Using Environment Variable
+
+```bash
+export VULCN_KEY=my-secret-passphrase
+vulcn store admin password
+```
+
+<Tip>
+  Set `VULCN_KEY` in your CI/CD environment to avoid interactive prompts during
+  automated scans.
+</Tip>
+
+## Output
+
+```bash
+   Auth type: form
+   Username: admin
+   Password: ********
+
+✅ Credentials saved to .vulcn/auth.enc
+⚠️  Add .vulcn/auth.enc to .gitignore
+```
+
+## Security Best Practices
+
+<Warning>
+  Always add `.vulcn/auth.enc` to your `.gitignore` file to prevent accidentally
+  committing encrypted credentials to version control.
+</Warning>
+
+```bash
+echo ".vulcn/auth.enc" >> .gitignore
+```
+
+- **Never commit** encrypted credential files to version control
+- **Use environment variables** (`VULCN_KEY`) in CI/CD instead of `--passphrase`
+- **Rotate credentials** regularly — re-run `vulcn store` to update
+- **Use unique passphrases** per project
+
+## Workflow
+
+The typical authenticated scanning workflow:
+
+```bash
+# 1. Store credentials
+vulcn store admin password --login-url https://app.example.com/login
+
+# 2. Crawl with authentication
+vulcn crawl https://app.example.com --creds .vulcn/auth.enc
+
+# 3. Run scans with authentication
+vulcn run sessions/01-search-form.vulcn.yml --creds .vulcn/auth.enc -p xss sqli
+```
+
+## See Also
+
+- [vulcn crawl](/cli/crawl) — Authenticated crawling with `--creds`
+- [vulcn run](/cli/run) — Authenticated scanning with `--creds`

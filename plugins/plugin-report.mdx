@@ -7,6 +7,13 @@ description: "Generate HTML dashboards, JSON, YAML, and SARIF v2.1.0 security re
 
 The report plugin generates branded, professional security reports at the end of each `vulcn run`. All formats are derived from the **canonical `VulcnReport` model** — a single source of truth built once via `buildReport()`, ensuring consistency across HTML, JSON, YAML, and SARIF outputs.
 
+<Info>
+  **Multi-session scans**: When running a session directory with multiple
+  sessions (e.g. from `vulcn crawl`), the report plugin generates a **single
+  aggregate report** containing findings from all sessions — not one report per
+  session.
+</Info>
+
 <CardGroup cols={4}>
   <Card title="HTML" icon="file-code">
     Modern dark-themed dashboard with risk gauge, severity breakdown, passive
@@ -273,8 +280,8 @@ jobs:
 ```
 
 <Tip>
-  Use `if: always()` on the upload step so SARIF results are uploaded even when
-  vulnerabilities are found (exit code 1).
+  Use `if: always()` on the upload step so SARIF results are always uploaded,
+  even if a previous step fails.
 </Tip>
 
 ### GitLab CI
@@ -292,15 +299,22 @@ security_scan:
 
 ### Exit Codes
 
-| Code | Meaning                  |
-| ---- | ------------------------ |
-| `0`  | No vulnerabilities found |
-| `1`  | Vulnerabilities detected |
+| Code | Meaning                                                |
+| ---- | ------------------------------------------------------ |
+| `0`  | Scan completed successfully (with or without findings) |
+| `1`  | Scan failed (load error, timeout, etc.)                |
 
-Use the exit code to gate deployments:
+The exit code indicates **tool success**, not whether vulnerabilities were found. To gate deployments on findings, check the report output:
 
 ```bash
-vulcn run session.vulcn.yml --report sarif || exit 1
+vulcn run session.vulcn.yml --report json --report-output ./reports
+
+# Check findings count from the JSON report
+FINDINGS=$(jq '.summary.totalFindings' reports/vulcn-report.json)
+if [ "$FINDINGS" -gt 0 ]; then
+  echo "❌ $FINDINGS vulnerabilities found"
+  exit 1
+fi
 ```
 
 ## HTML Report Features
@@ -439,5 +453,6 @@ await writeFile("vulcn-report.sarif", JSON.stringify(sarif, null, 2));
 | SARIF  | `vulcn-report.sarif` | `application/json` |
 
 <Card title="Plugin Hooks" icon="code" href="/plugins/hooks">
-  The report plugin uses the `onRunEnd` hook — see all available hooks
+  The report plugin uses the `onRunEnd` hook (single session) and `onScanEnd`
+  hook (multi-session aggregate) — see all available hooks
 </Card>

@@ -60,9 +60,9 @@ Use either the full name or any short alias:
 
 ```bash
 # These are equivalent:
-vulcn run session.yml -p sqli
-vulcn run session.yml -p sql
-vulcn run session.yml -p sql-injection
+vulcn run -p sqli
+vulcn run -p sql
+vulcn run -p sql-injection
 ```
 
 ## Custom Payload Files
@@ -103,7 +103,7 @@ plugins:
 Or via CLI:
 
 ```bash
-vulcn run session.vulcn.yml -f ./custom-payloads.yml
+vulcn run -f ./custom-payloads.yml
 ```
 
 ## Programmatic Usage

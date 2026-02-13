@@ -249,18 +249,18 @@ type PayloadCategory =
 ```typescript
 interface Session {
   name: string;
-  startUrl: string;
-  browser: BrowserType;
+  driver: string;
+  driverConfig: Record<string, unknown>;
   steps: Step[];
 }
 
 interface Step {
   id: string;
-  type: "navigate" | "click" | "fill" | "select" | "check";
-  timestamp: number;
+  type: string; // e.g., "browser.navigate", "browser.input", "browser.click"
   url?: string;
   selector?: string;
   value?: string;
+  injectable?: boolean;
 }
 ```
 
@@ -280,11 +280,8 @@ interface RunResult {
 
 ```typescript
 class PluginManager {
-  /** Load config from file */
-  loadConfig(path?: string): Promise<VulcnConfig>;
-
-  /** Load plugins declared in config */
-  loadPlugins(): Promise<void>;
+  /** Load plugins from flat VulcnProjectConfig (from .vulcn.yml) */
+  loadFromConfig(config: VulcnProjectConfig): Promise<void>;
 
   /** Add plugin programmatically */
   addPlugin(plugin: VulcnPlugin, config?: Record<string, unknown>): void;
@@ -315,27 +312,32 @@ class PluginManager {
 ## Usage Example
 
 ```typescript
-import { PluginManager, Runner, parseSession } from "@vulcn/engine";
+import {
+  DriverManager,
+  PluginManager,
+  parseProjectConfig,
+} from "@vulcn/engine";
+import browserDriver from "@vulcn/driver-browser";
 import myPlugin from "./my-plugin";
 
-// Create manager
+// Set up drivers
+const drivers = new DriverManager();
+drivers.register(browserDriver);
+
+// Create manager with config
 const manager = new PluginManager();
+const config = parseProjectConfig({ payloads: { types: ["xss"] } });
+await manager.loadFromConfig(config);
 
-// Add plugins
+// Add custom plugin
 manager.addPlugin(myPlugin, { threshold: 75 });
-
-// Initialize
 await manager.initialize();
 
-// Run tests
-const session = parseSession(yaml);
-const result = await Runner.execute(
-  session,
-  {
-    headless: true,
-  },
-  { pluginManager: manager },
-);
+// Parse session and run
+const session = drivers.parseSession(yaml);
+const result = await drivers.executeScan([session], manager, {
+  headless: true,
+});
 
 // Cleanup
 await manager.destroy();

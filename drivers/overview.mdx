@@ -73,22 +73,15 @@ driver: browser
 driverConfig:
   browser: chromium
   startUrl: https://example.com/login
-  viewport:
-    width: 1280
-    height: 720
 steps:
   - id: step_001
     type: browser.navigate
     url: https://example.com/login
-    timestamp: 0
   - id: step_002
     type: browser.input
     selector: input[name="username"]
     value: testuser
     injectable: true
-    timestamp: 1500
-metadata:
-  recordedAt: "2026-02-06T12:00:00Z"
 ```
 
 <Note>
@@ -156,14 +149,15 @@ vulcn record https://example.com --auto
 ### Programmatically
 
 ```typescript
-import { DriverManager, driverManager } from "@vulcn/engine";
+import { DriverManager } from "@vulcn/engine";
 import browserDriver from "@vulcn/driver-browser";
 
 // Register driver
-driverManager.register(browserDriver);
+const drivers = new DriverManager();
+drivers.register(browserDriver);
 
 // Option 1: Manual recording
-const handle = await driverManager.startRecording("browser", {
+const handle = await drivers.startRecording("browser", {
   startUrl: "https://example.com",
   browser: "chromium",
 });
@@ -172,7 +166,7 @@ const handle = await driverManager.startRecording("browser", {
 const session = await handle.stop();
 
 // Option 2: Auto-crawl (discovers forms automatically)
-const sessions = await driverManager.crawl(
+const sessions = await drivers.crawl(
   "browser",
   {
     startUrl: "https://example.com",

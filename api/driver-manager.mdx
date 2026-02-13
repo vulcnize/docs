@@ -10,13 +10,8 @@ The `DriverManager` class handles driver loading, registration, and lifecycle. I
 ## Import
 
 ```typescript
-import { DriverManager, driverManager } from "@vulcn/engine";
+import { DriverManager } from "@vulcn/engine";
 ```
-
-<Note>
-  `driverManager` is a default shared instance. Create your own `new
-  DriverManager()` for isolated testing.
-</Note>
 
 ## Constructor
 
@@ -219,10 +214,10 @@ const sessions = await manager.crawl(
 
 console.log(`Discovered ${sessions.length} injectable forms`);
 
-// Execute each session with payloads
-for (const session of sessions) {
-  const result = await manager.execute(session, pluginManager);
-}
+// Scan all sessions with a shared browser
+const result = await manager.executeScan(sessions, pluginManager, {
+  headless: true,
+});
 ```
 
 <Info>
@@ -407,37 +402,38 @@ interface RunResult {
 ## Complete Example
 
 ```typescript
-import { DriverManager, PluginManager } from "@vulcn/engine";
+import {
+  DriverManager,
+  PluginManager,
+  parseProjectConfig,
+} from "@vulcn/engine";
 import browserDriver from "@vulcn/driver-browser";
-import payloadsPlugin from "@vulcn/plugin-payloads";
-import xssPlugin from "@vulcn/plugin-detect-xss";
 
 async function runSecurityTest() {
   // Set up driver manager
-  const driverManager = new DriverManager();
-  driverManager.register(browserDriver);
+  const drivers = new DriverManager();
+  drivers.register(browserDriver);
 
-  // Set up plugin manager
-  const pluginManager = new PluginManager();
-  pluginManager.addPlugin(payloadsPlugin, { types: ["xss"] });
-  pluginManager.addPlugin(xssPlugin);
-  await pluginManager.initialize();
+  // Set up plugin manager from config
+  const plugins = new PluginManager();
+  const config = parseProjectConfig({
+    payloads: { types: ["xss"] },
+    detection: { xss: { dialogs: true, severity: "high" } },
+  });
+  await plugins.loadFromConfig(config);
 
   // Record a session
-  const handle = await driverManager.startRecording("browser", {
+  const handle = await drivers.startRecording("browser", {
     startUrl: "https://vulnerable-app.example.com",
     browser: "chromium",
     headless: false,
   });
 
   console.log("Recording... press Ctrl+C when done");
-
-  // In real usage, you'd wait for user interaction
-  // For this example, we'll stop immediately
   const session = await handle.stop();
 
-  // Execute with payloads
-  const result = await driverManager.execute(session, pluginManager, {
+  // Execute scan
+  const result = await drivers.executeScan([session], plugins, {
     headless: true,
     onFinding: (finding) => {
       console.log(`🚨 ${finding.severity}: ${finding.title}`);
@@ -445,10 +441,11 @@ async function runSecurityTest() {
   });
 
   console.log(`\nResults:`);
-  console.log(`  Steps: ${result.stepsExecuted}`);
-  console.log(`  Payloads: ${result.payloadsTested}`);
-  console.log(`  Findings: ${result.findings.length}`);
-  console.log(`  Duration: ${result.duration}ms`);
+  console.log(`  Payloads: ${result.aggregate.payloadsTested}`);
+  console.log(`  Findings: ${result.aggregate.findings.length}`);
+  console.log(`  Duration: ${result.aggregate.duration}ms`);
+
+  await plugins.destroy();
 }
 
 runSecurityTest().catch(console.error);

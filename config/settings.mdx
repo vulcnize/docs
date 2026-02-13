@@ -1,37 +1,29 @@
 ---
-title: "Settings"
-description: "Global settings in vulcn.config.yml"
+title: "Settings & Detection"
+seo:
+  title: "Vulcn Settings — Scan, Payloads, Detection & Crawl Configuration"
+  description: "Configure browser settings, payload types, XSS and SQLi detection, reflection analysis, passive scanning, and crawl parameters in .vulcn.yml."
+description: "Runtime settings and detection configuration in .vulcn.yml"
 ---
 
-## Settings Object
+## scan
 
-Global settings are configured under the `settings` key:
-
-```yaml
-settings:
-  browser: chromium
-  headless: true
-  timeout: 30000
-```
-
-## Available Settings
-
-| Setting    | Type    | Default      | Description             |
-| ---------- | ------- | ------------ | ----------------------- |
-| `browser`  | string  | `"chromium"` | Browser to use          |
-| `headless` | boolean | `true`       | Run in headless mode    |
-| `timeout`  | number  | `30000`      | Timeout in milliseconds |
-
-## Browser
-
-Choose which browser to use for recording and testing:
+Browser and execution settings for recording and scanning:
 
 ```yaml
-settings:
-  browser: chromium # or firefox, webkit
+scan:
+  browser: chromium # chromium | firefox | webkit
+  headless: true # Run headless (no visible window)
+  timeout: 30000 # Per-step timeout in milliseconds
 ```
 
-Available browsers:
+| Setting    | Type    | Default      | Description            |
+| ---------- | ------- | ------------ | ---------------------- |
+| `browser`  | string  | `"chromium"` | Browser engine to use  |
+| `headless` | boolean | `true`       | Run in headless mode   |
+| `timeout`  | number  | `30000`      | Per-step timeout in ms |
+
+### Available Browsers
 
 | Browser    | Description                          |
 | ---------- | ------------------------------------ |
@@ -44,58 +36,20 @@ Available browsers:
   performance.
 </Tip>
 
-### Installing Browsers
-
-```bash
-# Install specific browser
-vulcn install chromium
-
-# Install all browsers
-vulcn install --all
-
-# Check installed browsers
-vulcn doctor
-```
-
-## Headless Mode
-
-Control whether the browser runs with a visible window:
-
-```yaml
-settings:
-  headless: true   # No visible window (faster, CI/CD friendly)
-  headless: false  # Visible window (for debugging)
-```
-
-### CLI Override
-
-Override headless mode from the command line:
+### CLI Overrides
 
 ```bash
 # Run with visible browser
-vulcn run session.vulcn.yml --no-headless
+vulcn run --no-headless
 
 # Force headless mode
-vulcn run session.vulcn.yml --headless
+vulcn run --headless
+
+# Different browser
+vulcn run -b firefox
 ```
 
-## Timeout
-
-Set the maximum time to wait for page operations:
-
-```yaml
-settings:
-  timeout: 30000 # 30 seconds
-```
-
-<Note>
-  The timeout applies to navigation, element interactions, and other page
-  operations. Increase it for slow applications.
-</Note>
-
-## Environment Variables
-
-Some settings can be overridden via environment variables:
+### Environment Variables
 
 | Variable         | Description                             |
 | ---------------- | --------------------------------------- |
@@ -104,27 +58,243 @@ Some settings can be overridden via environment variables:
 | `DEBUG=vulcn:*`  | Enable debug logging                    |
 
 ```bash
-# Run with Firefox in visible mode
-VULCN_BROWSER=firefox VULCN_HEADLESS=false vulcn run session.vulcn.yml
+VULCN_BROWSER=firefox VULCN_HEADLESS=false vulcn run
 ```
+
+## payloads
+
+Configure which payload types to use and how they're loaded:
+
+```yaml
+payloads:
+  types:
+    - xss
+    - sqli
+  payloadbox: false # Opt-in to community payloads
+  limit: 100 # Max payloads per type
+  custom: null # Path to custom payload file
+```
+
+| Setting      | Type     | Default   | Description                                    |
+| ------------ | -------- | --------- | ---------------------------------------------- |
+| `types`      | string[] | `["xss"]` | Payload types to use                           |
+| `payloadbox` | boolean  | `false`   | Also load PayloadsAllTheThings payloads        |
+| `limit`      | number   | `100`     | Max payloads per type from PayloadBox          |
+| `custom`     | string   | `null`    | Path to custom payload YAML (relative to root) |
+
+### Payload Types
+
+| Type        | Aliases                        | Description          |
+| ----------- | ------------------------------ | -------------------- |
+| `xss`       | -                              | Cross-Site Scripting |
+| `sqli`      | `sql`, `sql-injection`         | SQL Injection        |
+| `xxe`       | -                              | XML External Entity  |
+| `cmd`       | `command`, `command-injection` | OS Command Injection |
+| `redirect`  | `open-redirect`                | Open Redirect        |
+| `traversal` | `lfi`, `path-traversal`        | Path Traversal       |
+
+### Custom Payload File
+
+```yaml
+payloads:
+  custom: ./my-payloads.yml
+```
+
+Custom payload file format:
+
+```yaml
+version: "1"
+payloads:
+  - name: custom-xss
+    category: xss
+    description: My organization's XSS payloads
+    payloads:
+      - "<script>alert('custom')</script>"
+      - "<img src=x onerror=alert('custom')>"
+```
+
+## detection
+
+Configure how Vulcn detects vulnerabilities. These flat keys map internally to detection plugins.
+
+### detection.xss
+
+Execution-based XSS detection via the `@vulcn/plugin-detect-xss` plugin:
+
+```yaml
+detection:
+  xss:
+    dialogs: true # Monitor alert/confirm/prompt
+    console: true # Monitor console markers
+    consoleMarker: "VULCN_XSS:" # Console marker prefix
+    domMutation: false # Check for injected <script> elements
+    severity: high # Finding severity
+    alertPatterns: # Patterns to match in alerts
+      - "XSS"
+      - "1"
+      - "document.domain"
+      - "document.cookie"
+      - "vulcn"
+      - "pwned"
+```
+
+| Setting         | Type     | Default             | Description                  |
+| --------------- | -------- | ------------------- | ---------------------------- |
+| `dialogs`       | boolean  | `true`              | Monitor alert/confirm/prompt |
+| `console`       | boolean  | `true`              | Detect console markers       |
+| `consoleMarker` | string   | `"VULCN_XSS:"`      | Console marker prefix        |
+| `domMutation`   | boolean  | `false`             | Check for injected scripts   |
+| `severity`      | string   | `"high"`            | Finding severity level       |
+| `alertPatterns` | string[] | `["XSS", "1", ...]` | Patterns to match in alerts  |
+
+### detection.reflection
+
+Input reflection and output encoding detection via `@vulcn/plugin-detect-reflection`:
+
+```yaml
+detection:
+  reflection:
+    enabled: true # Enable reflection detection
+    minLength: 4 # Minimum payload length to check
+    contexts: # Which HTML contexts to check
+      script: true
+      attribute: true
+      body: true
+    severity: # Severity by context
+      script: critical
+      attribute: medium
+      body: low
+```
+
+| Setting              | Type    | Default      | Description                         |
+| -------------------- | ------- | ------------ | ----------------------------------- |
+| `enabled`            | boolean | `true`       | Enable reflection detection         |
+| `minLength`          | number  | `4`          | Skip payloads shorter than this     |
+| `contexts.script`    | boolean | `true`       | Detect reflection in script context |
+| `contexts.attribute` | boolean | `true`       | Detect reflection in attributes     |
+| `contexts.body`      | boolean | `true`       | Detect reflection in HTML body      |
+| `severity.script`    | string  | `"critical"` | Severity for script reflection      |
+| `severity.attribute` | string  | `"medium"`   | Severity for attribute reflection   |
+| `severity.body`      | string  | `"low"`      | Severity for body reflection        |
+
+### detection.passive
+
+Enable passive security checks (headers, cookies, info disclosure, CORS):
+
+```yaml
+detection:
+  passive: true
+```
+
+When enabled, the `@vulcn/plugin-passive` plugin scans HTTP responses for:
+
+- Missing security headers (HSTS, CSP, X-Frame-Options)
+- Insecure cookie configurations
+- Information disclosure (server version, debug headers)
+- CORS misconfigurations
+- Mixed content (HTTP resources on HTTPS pages)
+
+## crawl
+
+Configure the web crawler for `vulcn crawl`:
+
+```yaml
+crawl:
+  depth: 2 # Max link-follow depth
+  maxPages: 20 # Max pages to visit
+  sameOrigin: true # Stay on the same origin
+  timeout: 10000 # Per-page timeout in ms
+```
+
+| Setting      | Type    | Default | Description                   |
+| ------------ | ------- | ------- | ----------------------------- |
+| `depth`      | number  | `2`     | Maximum crawl depth (BFS)     |
+| `maxPages`   | number  | `20`    | Maximum pages to visit        |
+| `sameOrigin` | boolean | `true`  | Only follow same-origin links |
+| `timeout`    | number  | `10000` | Per-page timeout in ms        |
+
+## report
+
+Configure report generation:
+
+```yaml
+report:
+  format: html # html | json | yaml | sarif | all | null
+```
+
+| Setting  | Type   | Default | Description                                           |
+| -------- | ------ | ------- | ----------------------------------------------------- |
+| `format` | string | `null`  | Report format: `html`, `json`, `yaml`, `sarif`, `all` |
+
+When `format` is `null`, no report is generated unless you pass `-r` on the CLI.
+
+### CLI Override
+
+```bash
+vulcn run -r sarif --report-output ./my-reports
+```
+
+## auth
+
+Optional authentication configuration:
+
+### Form-Based Auth
+
+```yaml
+auth:
+  strategy: form
+  loginUrl: https://app.example.com/login
+  userSelector: "#email" # Optional, auto-detected
+  passSelector: "#password" # Optional, auto-detected
+```
+
+### Header-Based Auth
+
+```yaml
+auth:
+  strategy: header
+  headers:
+    Authorization: "Bearer eyJhbG..."
+```
+
+Credentials themselves are stored encrypted via `vulcn store`, not in `.vulcn.yml`.
 
 ## Complete Example
 
 ```yaml
-# vulcn.config.yml
-version: "1"
+# .vulcn.yml — Full configuration
+target: https://example.com
 
-plugins:
-  - name: "@vulcn/plugin-payloads"
-
-  - name: "@vulcn/plugin-detect-xss"
-    config:
-      detectDialogs: true
-      detectConsole: true
-      severity: high
-
-settings:
+scan:
   browser: chromium
   headless: true
   timeout: 30000
+
+payloads:
+  types:
+    - xss
+    - sqli
+  payloadbox: false
+  limit: 100
+
+detection:
+  xss:
+    dialogs: true
+    console: true
+    severity: high
+  reflection:
+    enabled: true
+  passive: true
+
+crawl:
+  depth: 2
+  maxPages: 20
+  sameOrigin: true
+
+report:
+  format: html
+
+auth:
+  strategy: form
+  loginUrl: https://example.com/login
 ```

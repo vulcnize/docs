@@ -232,23 +232,14 @@ async function executeWithPayload(
 
 ## Step 5: Register the Driver
 
-Users register your driver via config:
-
-```yaml
-# vulcn.config.yml
-drivers:
-  - name: "@myorg/driver-mydriver"
-    config:
-      target: "my-target"
-```
-
-Or programmatically:
+Register your driver programmatically:
 
 ```typescript
-import { driverManager } from "@vulcn/engine";
+import { DriverManager } from "@vulcn/engine";
 import myDriver from "@myorg/driver-mydriver";
 
-driverManager.register(myDriver);
+const drivers = new DriverManager();
+drivers.register(myDriver);
 ```
 
 ## Best Practices

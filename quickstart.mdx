@@ -2,7 +2,7 @@
 title: "Quickstart"
 seo:
   title: "Vulcn Quickstart — Find Your First Vulnerability in 5 Minutes"
-  description: "Step-by-step guide to recording browser sessions, running automated penetration tests with XSS and SQLi payloads, and generating security reports with Vulcn."
+  description: "Step-by-step guide to initializing a project, crawling for forms, running automated penetration tests with XSS and SQLi payloads, and generating security reports with Vulcn."
 description: "Find your first vulnerability in under 5 minutes"
 ---
 
@@ -33,29 +33,48 @@ yarn global add vulcn
 
 </Step>
 
-<Step title="Initialize configuration">
+<Step title="Initialize a project">
 
-Create a `vulcn.config.yml` file with default plugins:
+Create a `.vulcn.yml` project config:
 
 ```bash
-vulcn init
+vulcn init https://your-target.com
 ```
 
-This creates a config file with the official detection plugins pre-configured:
+This creates a config file and `sessions/` directory:
 
 ```yaml
-# vulcn.config.yml
-version: "1"
-plugins:
-  - name: "@vulcn/plugin-payloads"
-  - name: "@vulcn/plugin-detect-xss"
-    config:
-      detectDialogs: true
-      detectConsole: true
-      severity: high
-settings:
+# .vulcn.yml
+target: https://your-target.com
+
+scan:
   browser: chromium
   headless: true
+  timeout: 30000
+
+payloads:
+  types:
+    - xss
+  payloadbox: false
+  limit: 100
+
+detection:
+  xss:
+    dialogs: true
+    console: true
+    domMutation: false
+    severity: high
+  reflection:
+    enabled: true
+  passive: true
+
+crawl:
+  depth: 2
+  maxPages: 20
+  sameOrigin: true
+
+report:
+  format: html
 ```
 
 </Step>
@@ -85,7 +104,13 @@ vulcn install --all
 Open a browser and record your interactions with the target application:
 
 ```bash
-vulcn record https://example.com --output session.vulcn.yml
+vulcn record
+```
+
+The target URL is read from `.vulcn.yml`. You can also override it:
+
+```bash
+vulcn record https://example.com
 ```
 
 <Tip>
@@ -102,32 +127,33 @@ In the browser:
 1. Navigate to a page with input fields
 2. Fill out a form (login, search, comment, etc.)
 3. Submit the form
-4. Close the browser when done
+4. Press **Ctrl+C** to stop recording
 
 </Step>
 
 <Step title="Session saved">
 
-Your interactions are saved to `session.vulcn.yml`:
+Your interactions are saved to `sessions/`:
 
 ```yaml
-name: Session 2026-02-06
-startUrl: https://example.com
-browser: chromium
+# sessions/recording-2026-02-14.yml
+name: Session 2026-02-14
+driver: browser
+driverConfig:
+  startUrl: https://example.com
+  browser: chromium
 steps:
   - id: step_001
-    type: navigate
+    type: browser.navigate
     url: https://example.com
-    timestamp: 1707192000000
   - id: step_002
-    type: fill
+    type: browser.input
     selector: input[name="search"]
     value: test query
-    timestamp: 1707192005000
+    injectable: true
   - id: step_003
-    type: click
+    type: browser.click
     selector: button[type="submit"]
-    timestamp: 1707192010000
 ```
 
 </Step>
@@ -138,37 +164,35 @@ steps:
 Skip manual recording entirely — let Vulcn discover forms automatically:
 
 ```bash
-vulcn crawl https://example.com
+vulcn crawl
 ```
 
-This finds all forms and injectable inputs across the site and generates session files for each one. See [vulcn crawl](/cli/crawl) for details.
+This finds all forms and injectable inputs across the site and generates session files in `sessions/`. The target URL is read from `.vulcn.yml`. See [vulcn crawl](/cli/crawl) for details.
 
 ## Run Security Tests
 
 <Steps>
 <Step title="Execute tests">
 
-Run the recorded session with security payloads:
+Run all sessions with security payloads:
 
 ```bash
-vulcn run session.vulcn.yml
+vulcn run
 ```
 
-By default, Vulcn fetches `xss` payloads from PayloadsAllTheThings and uses the `@vulcn/plugin-detect-xss` plugin for detection.
+Vulcn reads everything from `.vulcn.yml` — payload types, detection settings, browser config — and loads all sessions from `sessions/`.
 
 </Step>
 
-<Step title="Choose payload types">
+<Step title="Override payload types">
 
-Test with specific payload types:
+Test with specific payload types (overrides `.vulcn.yml`):
 
 ```bash
-vulcn run session.vulcn.yml -p xss sqli
+vulcn run -p xss sqli
 ```
 
 Available types: `xss`, `sqli`, `xxe`, `cmd`, `redirect`, `traversal`
-
-All payloads are fetched from [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings).
 
 </Step>
 
@@ -178,8 +202,9 @@ If vulnerabilities are found, you'll see output like:
 
 ```bash
 🔍 Running security tests
-   Session: Session 2026-02-06
-   Payloads: xss, sqli
+   Target: https://example.com
+   Sessions: 1 (Session 2026-02-14)
+   Payloads: xss
    Browser: chromium
    Headless: true
 
@@ -209,15 +234,16 @@ If vulnerabilities are found, you'll see output like:
 Generate a professional HTML security report:
 
 ```bash
-vulcn run session.vulcn.yml --report html
+vulcn run -r html
 ```
 
-This creates a `vulcn-report.html` file and opens it in your browser. The report includes a risk gauge, severity breakdown, and detailed finding cards with payloads and evidence.
+This creates a `vulcn-report.html` in `reports/` and opens it in your browser. The report includes a risk gauge, severity breakdown, and detailed finding cards with payloads and evidence.
 
-For CI/CD pipelines, use JSON:
+For CI/CD pipelines, use JSON or SARIF:
 
 ```bash
-vulcn run session.vulcn.yml --report json --report-output ./reports
+vulcn run -r json
+vulcn run -r sarif
 ```
 
 </Step>
@@ -254,9 +280,9 @@ Output:
 6 payload types | Source: PayloadsAllTheThings
 
 Usage:
-  vulcn run session.yml -p xss sqli
-  vulcn run session.yml -p xss sqli cmd xxe
-  vulcn run session.yml -f custom-payloads.yml
+  vulcn run -p xss sqli
+  vulcn run -p xss sqli cmd xxe
+  vulcn run --payload-file custom-payloads.yml
 ```
 
 ## Authenticated Scanning
@@ -267,30 +293,35 @@ For applications behind login pages, Vulcn can perform authenticated crawling an
 <Step title="Store credentials">
 
 ```bash
-vulcn store admin password --login-url https://app.example.com/login
+vulcn store admin password
 ```
 
-Credentials are encrypted with AES-256-GCM and saved to `.vulcn/auth.enc`. Set `VULCN_KEY` env var or enter a passphrase when prompted.
+Credentials are encrypted with AES-256-GCM and saved to `auth/state.enc`. Set `VULCN_KEY` env var or enter a passphrase when prompted.
+
+<Tip>
+  If your `.vulcn.yml` has an `auth` section with `loginUrl`, Vulcn uses it
+  automatically. Otherwise, pass `--login-url` on the CLI.
+</Tip>
 
 </Step>
 
 <Step title="Crawl with authentication">
 
 ```bash
-vulcn crawl https://app.example.com --creds .vulcn/auth.enc
+vulcn crawl
 ```
 
-Vulcn will decrypt credentials, perform a login, capture cookies/storage, and crawl all authenticated pages.
+Vulcn auto-discovers `auth/state.enc`, decrypts credentials, performs the login, captures cookies/storage, and crawls all authenticated pages.
 
 </Step>
 
 <Step title="Scan with authentication">
 
 ```bash
-vulcn run sessions/01-form.vulcn.yml --creds .vulcn/auth.enc -p xss sqli -r html
+vulcn run -p xss sqli -r html
 ```
 
-The scanner inherits the authenticated browser state, so it can test forms behind login.
+The scanner inherits the authenticated browser state, so it can test forms behind login. Auth is auto-discovered — no `--creds` flag needed.
 
 </Step>
 </Steps>
@@ -298,9 +329,8 @@ The scanner inherits the authenticated browser state, so it can test forms behin
 <Tip>
   For a hands-on demo, try the complete workflow against
   [DVWA](https://github.com/digininja/DVWA): ```bash docker run -d -p 8080:80
-  vulnerables/web-dvwa vulcn store admin password --login-url
-  http://localhost:8080/login.php vulcn crawl http://localhost:8080 --creds
-  .vulcn/auth.enc --run-after xss ```
+  vulnerables/web-dvwa vulcn init http://localhost:8080 vulcn store admin
+  password vulcn crawl --run ```
 </Tip>
 
 ## Next Steps
@@ -310,7 +340,7 @@ The scanner inherits the authenticated browser state, so it can test forms behin
     Learn all available commands and options
   </Card>
   <Card title="Configuration" icon="gear" href="/config/overview">
-    Customize Vulcn with vulcn.config.yml
+    Customize Vulcn with .vulcn.yml
   </Card>
   <Card title="Plugins" icon="plug" href="/plugins/overview">
     Add more detection capabilities with plugins

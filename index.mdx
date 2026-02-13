@@ -57,20 +57,29 @@ Vulcn is a **modern, fast penetration testing framework** designed for developer
 
 ## Architecture
 
-Vulcn v0.7.0 uses a modular architecture with **drivers** for different targets and **plugins** for detection and reporting:
+Vulcn v0.9.0 uses a modular architecture with **drivers** for different targets and **plugins** for detection and reporting:
 
 ```mermaid
 flowchart TB
     subgraph CLI["vulcn CLI"]
+        Init[vulcn init]
         Record[vulcn record]
         Crawl[vulcn crawl]
         Store[vulcn store]
         Run[vulcn run]
     end
 
+    subgraph Config[".vulcn.yml"]
+        Target[target URL]
+        Scan[scan settings]
+        Payloads[payload types]
+        Detection[detection config]
+    end
+
     subgraph Engine["@vulcn/engine"]
         DM[DriverManager]
         PM[PluginManager]
+        Project[Project Loader]
     end
 
     subgraph Drivers
@@ -80,7 +89,7 @@ flowchart TB
     end
 
     subgraph Plugins
-        Payloads["plugin-payloads"]
+        PayloadsP["plugin-payloads"]
         XSS["plugin-detect-xss"]
         SQLi["plugin-detect-sqli"]
         Reflect["plugin-detect-reflection"]
@@ -88,15 +97,18 @@ flowchart TB
         Report["plugin-report"]
     end
 
+    Init --> Config
     Record --> DM
     Crawl --> DM
-    Store --> DM
+    Store --> Project
+    Run --> Project
     Run --> DM
     Run --> PM
+    Config --> Project
     DM --> Browser
     Browser --> HttpScan
     Browser --> BrowserReplay
-    PM --> Payloads
+    PM --> PayloadsP
     PM --> XSS
     PM --> SQLi
     PM --> Reflect
@@ -110,26 +122,25 @@ flowchart TB
   <Accordion title="🚗 Driver System" icon="car">
     Modular drivers for different recording targets. Browser driver included, with API and CLI drivers coming soon.
     ```bash
-    # Record web application
-    vulcn record https://example.com --driver browser
+    # Record web application (target from .vulcn.yml)
+    vulcn record
     
-    # Future: Record API calls
-    vulcn record https://api.example.com --driver api
+    # Override target URL
+    vulcn record https://example.com
     ```
   </Accordion>
 
 <Accordion title="💉 Payload Injection" icon="syringe">
   Automatically injects security payloads into injectable fields during replay.
-  Payloads are fetched from PayloadsAllTheThings on demand. Use short aliases
-  for quick access to common types. ```bash vulcn run session.vulcn.yml -p xss
-  sqli cmd ```
+  Payloads are curated and context-aware. Use short aliases for quick access.
+  ```bash vulcn run -p xss sqli cmd ```
 </Accordion>
 
 <Accordion title="🔌 Plugin System" icon="plug">
   Extend Vulcn with plugins for custom detection, payload loading, and
-  reporting. Hook-based architecture for easy customization. ```yaml #
-  vulcn.config.yml plugins: - name: "@vulcn/plugin-detect-xss" - name:
-  "@vulcn/plugin-detect-reflection" - name: "@vulcn/plugin-report" ```
+  reporting. Hook-based architecture for easy customization. Plugins are
+  configured via flat keys in `.vulcn.yml`: ```yaml # .vulcn.yml detection: xss:
+  dialogs: true severity: high reflection: enabled: true passive: true ```
 </Accordion>
 
 <Accordion title="🎯 Execution-Based Detection" icon="bullseye">
@@ -142,13 +153,13 @@ flowchart TB
     Generate professional security reports in multiple formats. HTML reports feature a modern dark-themed dashboard with risk gauges and severity breakdowns. JSON output integrates directly into CI/CD pipelines.
     ```bash
     # Generate HTML report (auto-opens in browser)
-    vulcn run session.vulcn.yml --report html
+    vulcn run -r html
     
     # Generate JSON for CI/CD
-    vulcn run session.vulcn.yml --report json
+    vulcn run -r json
     
     # Generate all formats
-    vulcn run session.vulcn.yml --report all
+    vulcn run -r all
     ```
   </Accordion>
 </AccordionGroup>
@@ -158,12 +169,12 @@ flowchart TB
 <Steps>
   <Step title="Record or Crawl">
     Record browser interactions manually, or use `vulcn crawl` to auto-discover
-    forms. For authenticated apps, `vulcn store` encrypts credentials and
-    `--creds` enables login-then-crawl.
+    forms. For authenticated apps, `vulcn store` encrypts credentials and auth
+    is auto-discovered from `auth/state.enc`.
   </Step>
   <Step title="Choose Payloads">
-    Select from community-curated payload types (xss, sqli, xxe, cmd, redirect,
-    traversal), or load custom ones from files.
+    Select from curated payload types (xss, sqli, xxe, cmd, redirect, traversal)
+    in `.vulcn.yml`, or override with CLI flags.
   </Step>
   <Step title="Run Tests (Tiered)">
     **Tier 1:** HTTP fast scan replays requests via `fetch()` at ~50ms/payload,
@@ -203,30 +214,44 @@ yarn global add vulcn
 ## Quick Example
 
 ```bash
-# Initialize configuration
-vulcn init
+# Initialize project (creates .vulcn.yml + sessions/)
+vulcn init https://vulnerable-app.com
 
-# Record a session (opens browser)
-vulcn record https://vulnerable-app.com --output session.vulcn.yml
+# Auto-discover forms
+vulcn crawl
 
-# Run security tests
-vulcn run session.vulcn.yml
+# Run security tests (reads everything from .vulcn.yml)
+vulcn run
 
-# Run with multiple payload types and generate a report
-vulcn run session.vulcn.yml -p xss sqli -r html
+# Override payload types and generate a report
+vulcn run -p xss sqli -r html
 
 # List available payload types
 vulcn payloads
+```
+
+## Project Structure
+
+```
+my-project/
+├── .vulcn.yml          ← single source of truth
+├── sessions/           ← recorded/crawled session files
+│   ├── crawl-login-form.yml
+│   └── crawl-search-form.yml
+├── auth/               ← encrypted credentials
+│   └── state.enc
+└── reports/            ← generated reports
+    └── vulcn-report.html
 ```
 
 ## Packages
 
 | Package                           | Description                                               |
 | --------------------------------- | --------------------------------------------------------- |
-| `vulcn`                           | CLI tool — record, crawl, run, and manage plugins         |
+| `vulcn`                           | CLI tool — record, crawl, run                             |
 | `@vulcn/engine`                   | Core engine with driver & plugin systems                  |
 | `@vulcn/driver-browser`           | Playwright-based browser recording & replay               |
-| `@vulcn/plugin-payloads`          | Payload loading from PayloadsAllTheThings                 |
+| `@vulcn/plugin-payloads`          | Payload loading from curated + community sources          |
 | `@vulcn/plugin-detect-xss`        | Execution-based XSS detection                             |
 | `@vulcn/plugin-detect-sqli`       | SQL injection detection (error, timing, diff)             |
 | `@vulcn/plugin-detect-reflection` | Input reflection & output encoding detection              |

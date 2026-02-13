@@ -1,11 +1,14 @@
 ---
 title: "PluginManager"
+seo:
+  title: "PluginManager API — Plugin Loading and Lifecycle Management"
+  description: "API reference for the Vulcn PluginManager class. Load plugins from .vulcn.yml config, manage lifecycle hooks, and orchestrate payload injection and vulnerability detection."
 description: "Load and manage Vulcn plugins"
 ---
 
 ## Overview
 
-The `PluginManager` class handles plugin loading, initialization, and lifecycle management.
+The `PluginManager` class handles plugin loading, initialization, and lifecycle management. It maps flat `.vulcn.yml` config to internal plugins automatically.
 
 ## Constructor
 
@@ -15,35 +18,32 @@ const manager = new PluginManager();
 
 ## Methods
 
-### loadConfig
+### loadFromConfig
 
-Load configuration from a file.
+Load plugins from a flat `VulcnProjectConfig` (from `.vulcn.yml`). This is the primary entry point for the config system.
 
 ```typescript
-async loadConfig(path?: string): Promise<VulcnConfig>
+async loadFromConfig(config: VulcnProjectConfig): Promise<void>
 ```
 
-If no path is provided, searches for config files in the current directory.
+Maps user-facing config keys to internal plugin configs automatically:
 
 ```typescript
-// Auto-detect config file
-await manager.loadConfig();
+import { PluginManager, parseProjectConfig } from "@vulcn/engine";
 
-// Specific path
-await manager.loadConfig("./vulcn.config.yml");
-```
+const config = parseProjectConfig({
+  payloads: { types: ["xss", "sqli"] },
+  detection: {
+    xss: { dialogs: true, severity: "high" },
+    reflection: { enabled: true },
+    passive: true,
+  },
+});
 
-### loadPlugins
-
-Load all plugins defined in the configuration.
-
-```typescript
-async loadPlugins(): Promise<void>
-```
-
-```typescript
-await manager.loadConfig();
-await manager.loadPlugins();
+const manager = new PluginManager();
+await manager.loadFromConfig(config);
+// Automatically loads: plugin-payloads, plugin-detect-xss,
+// plugin-detect-sqli, plugin-detect-reflection, plugin-passive
 ```
 
 ### addPlugin
@@ -143,53 +143,81 @@ Add a finding to the collection.
 addFinding(finding: Finding): void
 ```
 
+### clearFindings
+
+Clear findings for a new run.
+
+```typescript
+clearFindings(): void
+```
+
+### getPlugins
+
+Get all loaded plugins.
+
+```typescript
+getPlugins(): LoadedPlugin[]
+```
+
+### getErrorHandler
+
+Get the error handler for post-run inspection.
+
+```typescript
+getErrorHandler(): ErrorHandler
+```
+
 ## Lifecycle
 
 ```mermaid
 flowchart TD
-    A[new PluginManager] --> B[loadConfig]
-    B --> C[loadPlugins or addPlugin]
-    C --> D[initialize]
-    D --> E[Ready for use]
-    E --> F[Runner.execute / Recorder.start]
-    F --> G[destroy]
+    A[new PluginManager] --> B[loadFromConfig]
+    B --> C[Ready for use]
+    C --> D[DriverManager.executeScan]
+    D --> E[destroy]
+```
+
+Or for manual plugin loading:
+
+```mermaid
+flowchart TD
+    A[new PluginManager] --> B[addPlugin]
+    B --> C[initialize]
+    C --> D[Ready for use]
+    D --> E[DriverManager.executeScan]
+    E --> F[destroy]
 ```
 
 ## Complete Example
 
 ```typescript
-import { PluginManager, Runner, parseSession } from "@vulcn/engine";
-import payloadsPlugin from "@vulcn/plugin-payloads";
-import detectXss from "@vulcn/plugin-detect-xss";
+import {
+  DriverManager,
+  PluginManager,
+  parseProjectConfig,
+} from "@vulcn/engine";
+import browserDriver from "@vulcn/driver-browser";
 
 async function main() {
-  // Create manager
+  // Register driver
+  const drivers = new DriverManager();
+  drivers.register(browserDriver);
+
+  // Parse session
+  const session = drivers.parseSession(yaml);
+
+  // Load plugins from config
   const manager = new PluginManager();
+  const config = parseProjectConfig({
+    payloads: { types: ["xss"] },
+    detection: { xss: { dialogs: true } },
+  });
+  await manager.loadFromConfig(config);
 
-  // Option 1: Load from config file
-  await manager.loadConfig("./vulcn.config.yml");
-  await manager.loadPlugins();
-
-  // Option 2: Add plugins programmatically
-  manager.addPlugin(payloadsPlugin, { types: ["xss"] });
-  manager.addPlugin(detectXss, { detectDialogs: true });
-
-  // Initialize
-  await manager.initialize();
-
-  // Check payloads
-  const payloads = manager.getPayloads();
-  console.log(`Loaded ${payloads.length} payload sets`);
-
-  // Run tests
-  const session = parseSession(yaml);
-  const result = await Runner.execute(
-    session,
-    {
-      headless: true,
-    },
-    { pluginManager: manager },
-  );
+  // Execute scan
+  const result = await drivers.executeScan([session], manager, {
+    headless: true,
+  });
 
   // Get findings
   const findings = manager.getFindings();
@@ -218,3 +246,44 @@ The plugin manager orchestrates hook execution across all loaded plugins:
 | **Destroy**        | `onDestroy` for each plugin          |
 
 Hooks are called in the order plugins were added/loaded.
+
+## Hook Variants
+
+The `PluginManager` provides three hook execution patterns:
+
+### callHook
+
+Call a hook on all plugins sequentially (fire-and-forget):
+
+```typescript
+await manager.callHook("onRunStart", async (hook, ctx) => {
+  await hook(ctx);
+});
+```
+
+### callHookCollect
+
+Call a hook and collect results from all plugins:
+
+```typescript
+const results = await manager.callHookCollect(
+  "onAfterPayload",
+  async (hook, ctx) => {
+    return await hook(responseData, ctx);
+  },
+);
+```
+
+### callHookPipe
+
+Call a hook that transforms a value through the plugin pipeline:
+
+```typescript
+const modified = await manager.callHookPipe(
+  "onBeforePayload",
+  initialPayload,
+  async (hook, value, ctx) => {
+    return await hook(value, ctx);
+  },
+);
+```

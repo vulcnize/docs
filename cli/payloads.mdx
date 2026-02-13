@@ -54,9 +54,9 @@ Output:
 6 payload types | Source: PayloadsAllTheThings
 
 Usage:
-  vulcn run session.yml -p xss sqli
-  vulcn run session.yml -p xss sqli cmd xxe
-  vulcn run session.yml -f custom-payloads.yml
+  vulcn run -p xss sqli
+  vulcn run -p xss sqli cmd xxe
+  vulcn run -f custom-payloads.yml
 ```
 
 ### Filter by Category
@@ -86,9 +86,9 @@ Use either the full name or any short alias:
 
 ```bash
 # These are equivalent:
-vulcn run session.yml -p sqli
-vulcn run session.yml -p sql-injection
-vulcn run session.yml -p sql
+vulcn run -p sqli
+vulcn run -p sql-injection
+vulcn run -p sql
 ```
 
 ## Custom Payloads
@@ -121,15 +121,12 @@ payloads:
 Use with `--payload-file`:
 
 ```bash
-vulcn run session.vulcn.yml -f ./my-payloads.yml
+vulcn run -f ./my-payloads.yml
 ```
 
-Or configure in `vulcn.config.yml`:
+Or configure in `.vulcn.yml`:
 
 ```yaml
-plugins:
-  - name: "@vulcn/plugin-payloads"
-    config:
-      files:
-        - ./my-payloads.yml
+payloads:
+  custom: ./my-payloads.yml
 ```

@@ -21,13 +21,12 @@
             "group": "CLI Reference",
             "pages": [
               "cli/overview",
+              "cli/init",
               "cli/record",
-              "cli/store",
               "cli/crawl",
               "cli/run",
-              "cli/payloads",
-              "cli/plugin",
-              "cli/init"
+              "cli/store",
+              "cli/payloads"
             ]
           },
           {

@@ -1,13 +1,19 @@
 ---
 title: "vulcn init"
-description: "Create a vulcn.config.yml file"
+description: "Create a .vulcn.yml project config"
 ---
 
 ## Usage
 
 ```bash
-vulcn init [options]
+vulcn init [url] [options]
 ```
+
+## Arguments
+
+| Argument | Description                      | Required |
+| -------- | -------------------------------- | -------- |
+| `url`    | Target URL to pre-fill in config | No       |
 
 ## Options
 
@@ -17,7 +23,7 @@ vulcn init [options]
 
 ## Description
 
-The `init` command creates a `vulcn.config.yml` file in the current directory with default settings and official plugins pre-configured.
+The `init` command creates a `.vulcn.yml` file in the current directory, marking it as a Vulcn project. It also creates the `sessions/` directory for storing recorded and crawled sessions.
 
 ## Examples
 
@@ -30,19 +36,43 @@ vulcn init
 Output:
 
 ```bash
-✔ Created vulcn.config.yml
+✔ Created .vulcn.yml
 
-📁 Configuration created
+📁 Project initialized
+   .vulcn.yml
+   sessions/
 
 Next steps:
-  1. Record a session:
-     vulcn record https://example.com -o session.vulcn.yml
+  1. Set your target URL in .vulcn.yml, then:
+     vulcn crawl
+     vulcn record
 
   2. Run security tests:
-     vulcn run session.vulcn.yml
+     vulcn run
+```
 
-  3. Customize payloads:
-     vulcn run session.vulcn.yml -p xss sqli
+### With Target URL
+
+```bash
+vulcn init https://dvwa.local
+```
+
+Output:
+
+```bash
+✔ Created .vulcn.yml
+
+📁 Project initialized
+   .vulcn.yml
+   sessions/
+
+Next steps:
+  1. Crawl or record:
+     vulcn crawl
+     vulcn record
+
+  2. Run security tests:
+     vulcn run
 ```
 
 ### Overwrite Existing
@@ -53,43 +83,98 @@ vulcn init --force
 
 ## Generated Configuration
 
-The generated `vulcn.config.yml`:
+The generated `.vulcn.yml`:
 
 ```yaml
-# Vulcn Configuration
+# Vulcn Project Configuration
 # Docs: https://docs.vulcn.dev/config
+#
+# This file is the single source of truth for your Vulcn project.
+# All commands auto-discover this file from the current directory.
+#
+# Convention:
+#   sessions/   ← recorded/crawled sessions
+#   auth/       ← encrypted credentials
+#   reports/    ← generated reports
 
-version: "1"
-plugins:
-  - name: "@vulcn/plugin-payloads"
-  - name: "@vulcn/plugin-detect-xss"
-    config:
-      detectDialogs: true
-      detectConsole: true
-      severity: high
-settings:
+target: https://example.com
+
+scan:
   browser: chromium
   headless: true
+  timeout: 30000
+
+payloads:
+  types:
+    - xss
+  payloadbox: false
+  limit: 100
+  custom: null
+
+detection:
+  xss:
+    dialogs: true
+    console: true
+    domMutation: false
+    severity: high
+  reflection:
+    enabled: true
+  passive: true
+
+crawl:
+  depth: 2
+  maxPages: 20
+  sameOrigin: true
+  timeout: 10000
+
+report:
+  format: html
 ```
 
-## What's Included
+## Configuration Sections
 
-### @vulcn/plugin-payloads
+### target
 
-The payloads plugin loads payloads from PayloadsAllTheThings on demand. Default type is `xss`.
+The URL to scan. Used by `vulcn crawl` and `vulcn record` as the default target.
 
-### @vulcn/plugin-detect-xss
+### scan
 
-The XSS detection plugin is configured with:
+Browser settings for scanning and recording:
 
-- **detectDialogs: true** - Monitors `alert()`, `confirm()`, `prompt()`
-- **detectConsole: true** - Detects console markers
-- **severity: high** - Findings marked as high severity
+- **browser: chromium** — Browser engine (chromium, firefox, webkit)
+- **headless: true** — Run tests without visible window
+- **timeout: 30000** — Per-step timeout in milliseconds
 
-### Settings
+### payloads
 
-- **browser: chromium** - Uses Chromium by default
-- **headless: true** - Runs tests in headless mode
+Payload configuration:
+
+- **types** — Payload types to use (xss, sqli, xxe, cmd, redirect, traversal)
+- **payloadbox** — Opt-in to PayloadsAllTheThings community payloads
+- **limit** — Max payloads per type
+- **custom** — Path to custom payload YAML file
+
+### detection
+
+Detection plugin settings:
+
+- **xss** — XSS detection via dialogs, console markers, DOM mutation
+- **reflection** — Input reflection detection
+- **passive** — Enable passive security checks (headers, cookies, CORS)
+
+### crawl
+
+Crawler settings:
+
+- **depth** — Max link-follow depth
+- **maxPages** — Max pages to visit
+- **sameOrigin** — Stay on same origin
+
+### report
+
+Report generation:
+
+- **format** — Output format (html, json, yaml, sarif, all)
 
 <Card title="Configuration Reference" icon="gear" href="/config/overview">
   Learn about all configuration options

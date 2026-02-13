@@ -34,23 +34,24 @@ The engine exposes two main systems:
 import {
   DriverManager,
   PluginManager,
-  driverManager,
-  pluginManager,
+  parseProjectConfig,
 } from "@vulcn/engine";
 import browserDriver from "@vulcn/driver-browser";
-import payloadsPlugin from "@vulcn/plugin-payloads";
-import detectXss from "@vulcn/plugin-detect-xss";
 
-// Register browser driver
-driverManager.register(browserDriver);
+// Set up drivers
+const drivers = new DriverManager();
+drivers.register(browserDriver);
 
-// Set up plugins
-pluginManager.addPlugin(payloadsPlugin, { types: ["xss"] });
-pluginManager.addPlugin(detectXss, { detectDialogs: true });
-await pluginManager.initialize();
+// Load plugins from config (maps flat keys to internal plugins)
+const manager = new PluginManager();
+const config = parseProjectConfig({
+  payloads: { types: ["xss"] },
+  detection: { xss: { dialogs: true, severity: "high" } },
+});
+await manager.loadFromConfig(config);
 
 // Record a session
-const handle = await driverManager.startRecording("browser", {
+const handle = await drivers.startRecording("browser", {
   startUrl: "https://example.com",
   browser: "chromium",
   headless: false,
@@ -60,15 +61,17 @@ const handle = await driverManager.startRecording("browser", {
 const session = await handle.stop();
 
 // Run security tests
-const result = await driverManager.execute(session, pluginManager, {
+const scanResult = await drivers.executeScan([session], manager, {
   headless: true,
   onFinding: (finding) => {
     console.log(`Found: ${finding.title}`);
   },
 });
 
-console.log(`Tested ${result.payloadsTested} payloads`);
-console.log(`Found ${result.findings.length} vulnerabilities`);
+console.log(`Tested ${scanResult.aggregate.payloadsTested} payloads`);
+console.log(`Found ${scanResult.aggregate.findings.length} vulnerabilities`);
+
+await manager.destroy();
 ```
 
 ## Module Exports
@@ -77,7 +80,7 @@ console.log(`Found ${result.findings.length} vulnerabilities`);
 
 ```typescript
 // Driver manager
-export { DriverManager, driverManager } from "./driver-manager";
+export { DriverManager } from "./driver-manager";
 export { DRIVER_API_VERSION } from "./driver-types";
 
 // Driver types
@@ -99,7 +102,7 @@ export type {
 
 ```typescript
 // Plugin manager
-export { PluginManager, pluginManager } from "./plugin-manager";
+export { PluginManager } from "./plugin-manager";
 export { PLUGIN_API_VERSION } from "./plugin-types";
 
 // Plugin types
@@ -136,24 +139,14 @@ export type {
 } from "./types";
 ```
 
-## Legacy Exports
-
-<Warning>
-  The following exports are deprecated and will be removed in v1.0. Import from
-  `@vulcn/driver-browser` instead.
-</Warning>
+### Project Config
 
 ```typescript
-// DEPRECATED - use DriverManager instead
-export { Recorder } from "./recorder";
-export { Runner } from "./runner";
-
-// DEPRECATED - use Session from driver-types
-export { parseSession, serializeSession } from "./session";
-export type { Session as LegacySession, Step as LegacyStep } from "./session";
-
-// DEPRECATED - use @vulcn/driver-browser
-export { launchBrowser, installBrowsers, checkBrowsers } from "./browser";
+// Project loading and config
+export { loadProject, findProjectRoot, CONFIG_FILENAME, DIRS } from "./project";
+export { parseProjectConfig, VulcnProjectConfigSchema } from "./config";
+export type { VulcnProjectConfig } from "./config";
+export type { VulcnProject, ProjectPaths } from "./project";
 ```
 
 ## Error Handling
@@ -162,7 +155,7 @@ All async methods may throw:
 
 ```typescript
 try {
-  const result = await driverManager.execute(session, pluginManager);
+  const result = await drivers.executeScan([session], manager);
 } catch (error) {
   if (error.message.includes("Driver")) {
     console.error("Driver error:", error.message);

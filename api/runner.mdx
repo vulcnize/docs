@@ -1,60 +1,49 @@
 ---
-title: "Runner"
+title: "Running Scans"
 description: "Execute security tests on recorded sessions"
 ---
 
 ## Overview
 
-The `Runner` class replays recorded sessions while injecting security payloads and monitoring for vulnerabilities.
+Security scans are executed through `DriverManager.executeScan()`, which replays recorded sessions with security payloads injected into injectable form fields.
 
-## Static Methods
+<Warning>
+  The legacy `Runner` class is deprecated. Use `DriverManager.executeScan()` for
+  all new code.
+</Warning>
 
-### Runner.execute
-
-Execute security tests on a session.
-
-```typescript
-static async execute(
-  session: Session,
-  options: RunnerOptions,
-  context?: { pluginManager?: PluginManager }
-): Promise<RunResult>
-```
-
-**Parameters:**
-
-| Name      | Type          | Description             |
-| --------- | ------------- | ----------------------- |
-| `session` | Session       | Session to execute      |
-| `options` | RunnerOptions | Execution options       |
-| `context` | object        | Optional plugin manager |
-
-**Returns:** `RunResult` with findings
-
-**Example:**
+## Quick Start
 
 ```typescript
-import { Runner, parseSession, PluginManager } from "@vulcn/engine";
-import detectXss from "@vulcn/plugin-detect-xss";
+import {
+  DriverManager,
+  PluginManager,
+  parseProjectConfig,
+} from "@vulcn/engine";
+import browserDriver from "@vulcn/driver-browser";
 
-const session = parseSession(yaml);
+// Set up drivers
+const drivers = new DriverManager();
+drivers.register(browserDriver);
 
-const manager = new PluginManager();
-manager.addPlugin(detectXss);
-await manager.initialize();
+// Load plugins from config
+const plugins = new PluginManager();
+const config = parseProjectConfig({
+  payloads: { types: ["xss", "sqli"] },
+  detection: { xss: { dialogs: true, severity: "high" } },
+});
+await plugins.loadFromConfig(config);
 
-const result = await Runner.execute(
-  session,
-  {
-    headless: true,
-    onFinding: (finding) => {
-      console.log(`Found: ${finding.title}`);
-    },
+// Execute scan
+const result = await drivers.executeScan(sessions, plugins, {
+  headless: true,
+  onFinding: (finding) => {
+    console.log(`Found: ${finding.title}`);
   },
-  { pluginManager: manager },
-);
+});
 
-console.log(`Found ${result.findings.length} vulnerabilities`);
+console.log(`Found ${result.aggregate.findings.length} vulnerabilities`);
+await plugins.destroy();
 ```
 
 ## RunnerOptions
@@ -112,15 +101,15 @@ interface Finding {
 ## Processing Findings
 
 ```typescript
-const result = await Runner.execute(session, options);
+const result = await drivers.executeScan(sessions, plugins);
 
 // Filter by severity
-const criticalFindings = result.findings.filter(
+const criticalFindings = result.aggregate.findings.filter(
   (f) => f.severity === "critical" || f.severity === "high",
 );
 
 // Group by type
-const byType = result.findings.reduce(
+const byType = result.aggregate.findings.reduce(
   (acc, f) => {
     acc[f.type] = acc[f.type] || [];
     acc[f.type].push(f);
@@ -130,7 +119,7 @@ const byType = result.findings.reduce(
 );
 
 // Generate report
-for (const finding of result.findings) {
+for (const finding of result.aggregate.findings) {
   console.log(`[${finding.severity.toUpperCase()}] ${finding.title}`);
   console.log(`  URL: ${finding.url}`);
   console.log(`  Payload: ${finding.payload}`);
@@ -145,7 +134,7 @@ for (const finding of result.findings) {
 Process findings as they're discovered:
 
 ```typescript
-const result = await Runner.execute(session, {
+const result = await drivers.executeScan(sessions, plugins, {
   headless: true,
   onFinding: (finding) => {
     // Log immediately
@@ -169,51 +158,49 @@ const result = await Runner.execute(session, {
 ## Complete Example
 
 ```typescript
-import { Runner, PluginManager, parseSession } from "@vulcn/engine";
-import payloadsPlugin from "@vulcn/plugin-payloads";
-import detectXss from "@vulcn/plugin-detect-xss";
-import detectReflection from "@vulcn/plugin-detect-reflection";
-import fs from "fs/promises";
+import {
+  DriverManager,
+  PluginManager,
+  parseProjectConfig,
+  loadProject,
+} from "@vulcn/engine";
+import browserDriver from "@vulcn/driver-browser";
 
-async function runTests(sessionPath: string) {
-  // Load session
-  const yaml = await fs.readFile(sessionPath, "utf-8");
-  const session = parseSession(yaml);
+async function runTests() {
+  // Load project config from .vulcn.yml
+  const project = await loadProject();
 
-  // Set up plugins
-  const manager = new PluginManager();
-  manager.addPlugin(payloadsPlugin, {
-    types: ["xss", "sqli"],
+  // Set up drivers
+  const drivers = new DriverManager();
+  drivers.register(browserDriver);
+
+  // Load plugins from project config
+  const plugins = new PluginManager();
+  await plugins.loadFromConfig(project.config);
+
+  // Load sessions from sessions/ directory
+  const sessions = project.sessions;
+
+  // Run scan
+  console.log(`Testing ${sessions.length} sessions...`);
+
+  const result = await drivers.executeScan(sessions, plugins, {
+    headless: true,
+    onFinding: (f) => console.log(`Found: ${f.title}`),
   });
-  manager.addPlugin(detectXss, { detectDialogs: true });
-  manager.addPlugin(detectReflection, { detectScript: true });
-  await manager.initialize();
-
-  // Run tests
-  console.log(`Testing ${session.name}...`);
-
-  const result = await Runner.execute(
-    session,
-    {
-      headless: true,
-      onFinding: (f) => console.log(`Found: ${f.title}`),
-    },
-    { pluginManager: manager },
-  );
 
   // Summary
   console.log(`\nResults:`);
-  console.log(`  Steps: ${result.stepsExecuted}`);
-  console.log(`  Payloads: ${result.payloadsTested}`);
-  console.log(`  Duration: ${(result.duration / 1000).toFixed(1)}s`);
-  console.log(`  Findings: ${result.findings.length}`);
+  console.log(`  Payloads: ${result.aggregate.payloadsTested}`);
+  console.log(`  Duration: ${(result.aggregate.duration / 1000).toFixed(1)}s`);
+  console.log(`  Findings: ${result.aggregate.findings.length}`);
 
   // Cleanup
-  await manager.destroy();
+  await plugins.destroy();
 
   // Exit with error code if findings
-  process.exit(result.findings.length > 0 ? 1 : 0);
+  process.exit(result.aggregate.findings.length > 0 ? 1 : 0);
 }
 
-runTests("session.vulcn.yml");
+runTests();
 ```

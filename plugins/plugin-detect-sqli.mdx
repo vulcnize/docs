@@ -21,7 +21,7 @@ The SQL injection detection plugin identifies SQLi vulnerabilities using three c
 The plugin is auto-loaded by the CLI when SQL injection payloads are used:
 
 ```bash
-vulcn run session.vulcn.yml -p sqli
+vulcn run -p sqli
 ```
 
 For manual installation:
@@ -124,9 +124,9 @@ The CLI automatically loads this plugin when SQL injection payloads are requeste
 
 ```bash
 # These all trigger auto-loading:
-vulcn run session.yml -p sqli
-vulcn run session.yml -p sql
-vulcn run session.yml -p sql-injection
+vulcn run -p sqli
+vulcn run -p sql
+vulcn run -p sql-injection
 ```
 
 No configuration needed — just use `sqli` payloads and detection is active.

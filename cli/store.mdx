@@ -23,20 +23,17 @@ vulcn store [username] [password] [options]
 
 ## Options
 
-| Option                      | Description                                    | Default            |
-| --------------------------- | ---------------------------------------------- | ------------------ |
-| `--type <type>`             | Auth type: `form` or `header`                  | `form`             |
-| `--login-url <url>`         | Login page URL (for form auth)                 | -                  |
-| `--username-selector <css>` | CSS selector for username field                | Auto-detected      |
-| `--password-selector <css>` | CSS selector for password field                | Auto-detected      |
-| `--header-name <name>`      | Header name (for header auth)                  | `Authorization`    |
-| `--header-value <value>`    | Header value (for header auth)                 | -                  |
-| `-o, --output <file>`       | Output file path                               | `.vulcn/auth.enc`  |
-| `--passphrase <passphrase>` | Encryption passphrase (or set `VULCN_KEY` env) | Interactive prompt |
+| Option                      | Description                                     | Default            |
+| --------------------------- | ----------------------------------------------- | ------------------ |
+| `--header <header>`         | Header auth (e.g., `"Authorization: Bearer x"`) | -                  |
+| `--passphrase <passphrase>` | Encryption passphrase (or set `VULCN_KEY`)      | Interactive prompt |
+| `--login-url <url>`         | Custom login URL (overrides `.vulcn.yml`)       | from config        |
+| `--user-field <selector>`   | CSS selector for username field                 | Auto-detected      |
+| `--pass-field <selector>`   | CSS selector for password field                 | Auto-detected      |
 
 ## Description
 
-The `store` command securely encrypts authentication credentials using **AES-256-GCM** with PBKDF2 key derivation (600,000 iterations). The encrypted file can then be used with `vulcn crawl --creds` and `vulcn run --creds` for authenticated security scanning.
+The `store` command securely encrypts authentication credentials using **AES-256-GCM** with PBKDF2 key derivation (600,000 iterations). The encrypted file is saved to `auth/state.enc` next to `.vulcn.yml`, and is automatically discovered by `vulcn crawl` and `vulcn run`.
 
 ## Encryption Details
 
@@ -54,42 +51,35 @@ The passphrase is resolved in this order:
 
 ## Examples
 
-### Form-Based Login (DVWA)
+### Form-Based Login
 
 ```bash
-vulcn store admin password --login-url http://localhost:8080/login.php
+vulcn store admin password
 ```
 
-When used with `vulcn crawl --creds`, Vulcn will:
+When used with `vulcn crawl` or `vulcn run`, Vulcn will:
 
-1. Navigate to the login URL
+1. Navigate to the login URL (from `.vulcn.yml` `auth.loginUrl` or `--login-url`)
 2. Auto-detect username/password fields
 3. Fill the form and submit
 4. Capture browser cookies and storage state
 
-### Form-Based Login with Custom Selectors
+### Form-Based Login with Login URL
 
 ```bash
-vulcn store admin p@ssw0rd \
-  --login-url https://app.example.com/signin \
-  --username-selector '#email' \
-  --password-selector '#password'
+vulcn store admin password --login-url https://app.example.com/login
 ```
 
 ### Header-Based Auth (API Token)
 
 ```bash
-vulcn store --type header \
-  --header-name Authorization \
-  --header-value "Bearer eyJhbG..."
+vulcn store --header "Authorization: Bearer eyJhbG..."
 ```
 
 ### Header-Based Auth (API Key)
 
 ```bash
-vulcn store --type header \
-  --header-name X-API-Key \
-  --header-value "sk_live_abc123"
+vulcn store --header "X-API-Key: sk_live_abc123"
 ```
 
 ### Using Environment Variable
@@ -111,19 +101,34 @@ vulcn store admin password
    Username: admin
    Password: ********
 
-✅ Credentials saved to .vulcn/auth.enc
-⚠️  Add .vulcn/auth.enc to .gitignore
+✅ Credentials saved to auth/state.enc
+⚠️  Add auth/ to .gitignore
 ```
+
+## Auth Configuration in .vulcn.yml
+
+You can also configure authentication directly in `.vulcn.yml`:
+
+```yaml
+# .vulcn.yml
+auth:
+  strategy: form
+  loginUrl: https://app.example.com/login
+  userSelector: "#email"
+  passSelector: "#password"
+```
+
+When present, `vulcn store` will use these values as defaults (CLI flags still override).
 
 ## Security Best Practices
 
 <Warning>
-  Always add `.vulcn/auth.enc` to your `.gitignore` file to prevent accidentally
+  Always add `auth/` to your `.gitignore` file to prevent accidentally
   committing encrypted credentials to version control.
 </Warning>
 
 ```bash
-echo ".vulcn/auth.enc" >> .gitignore
+echo "auth/" >> .gitignore
 ```
 
 - **Never commit** encrypted credential files to version control
@@ -137,16 +142,21 @@ The typical authenticated scanning workflow:
 
 ```bash
 # 1. Store credentials
-vulcn store admin password --login-url https://app.example.com/login
+vulcn store admin password
 
-# 2. Crawl with authentication
-vulcn crawl https://app.example.com --creds .vulcn/auth.enc
+# 2. Crawl with authentication (auto-discovered from auth/state.enc)
+vulcn crawl
 
-# 3. Run scans with authentication
-vulcn run sessions/01-search-form.vulcn.yml --creds .vulcn/auth.enc -p xss sqli
+# 3. Run scans with authentication (auto-discovered)
+vulcn run -p xss sqli -r html
 ```
+
+<Note>
+  No `--creds` flag is needed. Auth is automatically discovered from
+  `auth/state.enc` next to `.vulcn.yml`.
+</Note>
 
 ## See Also
 
-- [vulcn crawl](/cli/crawl) — Authenticated crawling with `--creds`
-- [vulcn run](/cli/run) — Authenticated scanning with `--creds`
+- [vulcn crawl](/cli/crawl) — Authenticated crawling
+- [vulcn run](/cli/run) — Authenticated scanning

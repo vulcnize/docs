@@ -1,18 +1,14 @@
 ---
 title: "Configuration Overview"
-description: "Configure Vulcn with vulcn.config.yml"
+seo:
+  title: "Vulcn Configuration — .vulcn.yml Reference"
+  description: "Configure Vulcn with the .vulcn.yml project config file. Define scan settings, payload types, detection plugins, crawl depth, report format, and authentication."
+description: "Configure Vulcn with .vulcn.yml"
 ---
 
 ## Configuration File
 
-Vulcn uses a YAML configuration file to manage plugins and settings. The file can be named:
-
-- `vulcn.config.yml` (recommended)
-- `vulcn.config.yaml`
-- `vulcn.config.json`
-- `.vulcnrc.yml`
-- `.vulcnrc.yaml`
-- `.vulcnrc.json`
+Vulcn uses a single `.vulcn.yml` file as the **single source of truth** for all project configuration. Its presence marks a directory as a Vulcn project.
 
 ## Quick Start
 
@@ -25,89 +21,192 @@ vulcn init
 ## Full Example
 
 ```yaml
-# vulcn.config.yml
-version: "1"
+# .vulcn.yml
+target: https://example.com
 
-plugins:
-  # Payload loading
-  - name: "@vulcn/plugin-payloads"
-    config:
-      types:
-        - xss
-        - sqli
-      files:
-        - ./custom-payloads.yml
-
-  # XSS detection (execution-based)
-  - name: "@vulcn/plugin-detect-xss"
-    config:
-      detectDialogs: true
-      detectConsole: true
-      consoleMarker: "VULCN_XSS:"
-      severity: high
-
-  # Reflection detection (pattern-based)
-  - name: "@vulcn/plugin-detect-reflection"
-    config:
-      detectBody: true
-      detectScript: true
-      detectAttribute: true
-      bodySeverity: low
-      scriptSeverity: medium
-
-  # Report generation
-  - name: "@vulcn/plugin-report"
-    config:
-      format: html
-      outputDir: ./reports
-
-settings:
+scan:
   browser: chromium
   headless: true
   timeout: 30000
+
+payloads:
+  types:
+    - xss
+    - sqli
+  payloadbox: false
+  limit: 100
+  custom: ./my-payloads.yml
+
+detection:
+  xss:
+    dialogs: true
+    console: true
+    consoleMarker: "VULCN_XSS:"
+    domMutation: false
+    severity: high
+    alertPatterns:
+      - "XSS"
+      - "1"
+      - "document.domain"
+  reflection:
+    enabled: true
+    minLength: 4
+    contexts:
+      script: true
+      attribute: true
+      body: true
+    severity:
+      script: critical
+      attribute: medium
+      body: low
+  passive: true
+
+crawl:
+  depth: 2
+  maxPages: 20
+  sameOrigin: true
+  timeout: 10000
+
+report:
+  format: html
+
+auth:
+  strategy: form
+  loginUrl: https://example.com/login
 ```
 
 ## Schema
 
 ```yaml
-version: "1" # Config version (required)
+target: string # Target URL to scan (optional)
 
-plugins: # Array of plugins
-  - name: string # Plugin package name
-    config: object # Plugin-specific configuration
-    enabled: boolean # Enable/disable (default: true)
+scan: # Browser & execution settings
+  browser: string # chromium | firefox | webkit (default: chromium)
+  headless: boolean # Run headless (default: true)
+  timeout: number # Per-step timeout in ms (default: 30000)
 
-settings: # Global settings
-  browser: string # chromium | firefox | webkit
-  headless: boolean # Run headless
-  timeout: number # Timeout in milliseconds
+payloads: # Payload configuration
+  types: string[] # Payload types: xss, sqli, xxe, cmd, redirect, traversal
+  payloadbox: boolean # Opt-in to community payloads (default: false)
+  limit: number # Max payloads per type (default: 100)
+  custom: string | null # Path to custom payload file (default: null)
+
+detection: # Detection plugin settings
+  xss: # XSS detection
+    dialogs: boolean # Monitor alert/confirm/prompt (default: true)
+    console: boolean # Monitor console markers (default: true)
+    consoleMarker: string # Marker prefix (default: "VULCN_XSS:")
+    domMutation: boolean # Check for injected scripts (default: false)
+    severity: string # Finding severity (default: "high")
+    alertPatterns: string[] # Patterns to match in alerts
+  reflection: # Reflection detection
+    enabled: boolean # Enable (default: true)
+    minLength: number # Minimum payload length to check (default: 4)
+    contexts: # Which contexts to check
+      script: boolean # (default: true)
+      attribute: boolean # (default: true)
+      body: boolean # (default: true)
+    severity: # Severity per context
+      script: string # (default: "critical")
+      attribute: string # (default: "medium")
+      body: string # (default: "low")
+  passive: boolean # Enable passive checks (default: true)
+
+crawl: # Crawler settings
+  depth: number # Max crawl depth (default: 2)
+  maxPages: number # Max pages to visit (default: 20)
+  sameOrigin: boolean # Stay on same origin (default: true)
+  timeout: number # Per-page timeout in ms (default: 10000)
+
+report: # Report settings
+  format: string | null # html | json | yaml | sarif | all (default: null)
+
+auth: # Authentication (optional)
+  strategy: string # "form" or "header"
+  loginUrl: string # Login page URL (for form auth)
+  userSelector: string | null # CSS selector for username field
+  passSelector: string | null # CSS selector for password field
+  headers: object # Headers to include (for header auth)
 ```
 
 ## Sections
 
 <CardGroup cols={2}>
-  <Card title="Plugins" icon="plug" href="/config/plugins">
-    Configure plugins and their options
+  <Card title="Scan, Payloads & Detection" icon="gear" href="/config/settings">
+    Runtime settings and detection configuration
   </Card>
-  <Card title="Settings" icon="gear" href="/config/settings">
-    Global runtime settings
+  <Card title="Plugin System" icon="plug" href="/plugins/overview">
+    How flat config keys map to internal plugins
   </Card>
 </CardGroup>
 
-## Config Resolution
+## Config Discovery
 
-Vulcn searches for configuration files in this order:
+Vulcn finds `.vulcn.yml` by walking up from the current working directory:
 
-1. Path specified via `--config` flag
-2. `vulcn.config.yml` in current directory
-3. `vulcn.config.yaml` in current directory
-4. `vulcn.config.json` in current directory
-5. `.vulcnrc.yml` in current directory
-6. `.vulcnrc.yaml` in current directory
-7. `.vulcnrc.json` in current directory
+```
+/home/user/project/nested/     ← cwd
+/home/user/project/.vulcn.yml  ← found!
+```
 
-If no config file is found, Vulcn uses defaults:
+This means all commands work from any subdirectory of a Vulcn project.
 
-- No plugins configured (but CLI auto-loads `@vulcn/plugin-detect-xss`)
-- Browser: chromium
-- Headless: true
+If no `.vulcn.yml` is found, commands that require it (like `run`, `crawl`, `record`) will fail with:
+
+```
+No .vulcn.yml found. Run `vulcn init` to create one.
+```
+
+## Project Structure
+
+`.vulcn.yml` anchors a convention-based project structure:
+
+```
+my-project/
+├── .vulcn.yml          ← config (single source of truth)
+├── sessions/           ← recorded/crawled sessions
+├── auth/               ← encrypted credentials
+└── reports/            ← generated reports
+```
+
+All directories are auto-created when needed.
+
+## CLI Overrides
+
+CLI flags override config values for that run only — the `.vulcn.yml` file is never modified:
+
+```bash
+# Override payload types
+vulcn run -p xss sqli
+
+# Override browser
+vulcn run -b firefox
+
+# Override headless
+vulcn run --no-headless
+
+# Override report format
+vulcn run -r sarif
+```
+
+## Default Values
+
+All fields have sensible defaults. An empty `.vulcn.yml` is valid and uses:
+
+| Field                          | Default    |
+| ------------------------------ | ---------- |
+| `scan.browser`                 | `chromium` |
+| `scan.headless`                | `true`     |
+| `scan.timeout`                 | `30000`    |
+| `payloads.types`               | `["xss"]`  |
+| `payloads.payloadbox`          | `false`    |
+| `payloads.limit`               | `100`      |
+| `detection.xss.dialogs`        | `true`     |
+| `detection.xss.console`        | `true`     |
+| `detection.xss.severity`       | `"high"`   |
+| `detection.reflection.enabled` | `true`     |
+| `detection.passive`            | `true`     |
+| `crawl.depth`                  | `2`        |
+| `crawl.maxPages`               | `20`       |
+| `crawl.sameOrigin`             | `true`     |
+| `report.format`                | `null`     |

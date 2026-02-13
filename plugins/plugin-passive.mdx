@@ -40,13 +40,13 @@ Enable the passive scanner with the `--passive` flag:
 
 ```bash
 # Run active + passive scanning together
-vulcn run session.vulcn.yml -p xss --passive
+vulcn run -p xss --passive
 
 # Passive scanning with HTML report
-vulcn run session.vulcn.yml --passive -r html
+vulcn run --passive -r html
 
 # Passive + active scanning with SARIF output for CI/CD
-vulcn run session.vulcn.yml -p xss sqli --passive -r sarif
+vulcn run -p xss sqli --passive -r sarif
 ```
 
 ## Configuration
@@ -195,10 +195,10 @@ The passive scanner complements active payload-based testing:
 
 ```bash
 # Full security assessment: active XSS + SQLi + passive checks
-vulcn run session.vulcn.yml -p xss sqli --passive -r html
+vulcn run -p xss sqli --passive -r html
 
 # Passive-only (still requires payloads for session replay)
-vulcn run session.vulcn.yml --passive -r json
+vulcn run --passive -r json
 ```
 
 <Tip>

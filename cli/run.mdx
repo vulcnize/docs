@@ -3,42 +3,49 @@ title: "vulcn run"
 seo:
   title: "vulcn run — Execute Security Tests with Payload Injection"
   description: "Run automated penetration tests on recorded sessions. Inject XSS, SQLi, and other security payloads into every input field and generate detailed security reports."
-description: "Run security tests on a recorded session with payload injection and report generation"
+description: "Run security tests with payload injection and report generation"
 ---
 
 ## Usage
 
 ```bash
-vulcn run <session> [options]
+vulcn run [options]
 ```
 
-## Arguments
-
-| Argument  | Description                                          | Required |
-| --------- | ---------------------------------------------------- | -------- |
-| `session` | Session file (`.vulcn.yml`) or directory (`.vulcn/`) | Yes      |
+The `run` command takes **no arguments** — it reads everything from `.vulcn.yml` and loads sessions from `sessions/`. CLI flags override config values for this run only.
 
 ## Options
 
-| Option                      | Description                                              | Default           |
-| --------------------------- | -------------------------------------------------------- | ----------------- |
-| `-p, --payload <names...>`  | Payload types to use (xss, sqli, cmd, etc.)              | `xss`             |
-| `-f, --payload-file <file>` | Load custom payloads from YAML/JSON file                 | -                 |
-| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)               | `chromium`        |
-| `--headless`                | Run in headless mode                                     | `true`            |
-| `--no-headless`             | Run with visible browser                                 | -                 |
-| `-r, --report <format>`     | Generate report: `html`, `json`, `yaml`, `sarif`, `all`  | -                 |
-| `--report-output <dir>`     | Output directory for reports                             | `.`               |
-| `--passive`                 | Enable passive security scanner (headers, cookies, CORS) | -                 |
-| `--creds <file>`            | Credentials file for authenticated scanning              | `.vulcn/auth.enc` |
+| Option                      | Description                                             | Default     |
+| --------------------------- | ------------------------------------------------------- | ----------- |
+| `-p, --payload <names...>`  | Payload types (overrides .vulcn.yml)                    | from config |
+| `-f, --payload-file <file>` | Load custom payloads from YAML/JSON file                | -           |
+| `-b, --browser <browser>`   | Browser to use (chromium, firefox, webkit)              | from config |
+| `--headless`                | Run in headless mode                                    | from config |
+| `--no-headless`             | Run with visible browser                                | -           |
+| `-r, --report <format>`     | Generate report: `html`, `json`, `yaml`, `sarif`, `all` | from config |
+| `--report-output <dir>`     | Output directory for reports                            | `reports/`  |
+| `--passive`                 | Enable passive security scanner                         | from config |
+| `--no-passive`              | Disable passive scanner                                 | -           |
+| `--payloadbox`              | Also load PayloadsAllTheThings payloads                 | from config |
 
 ## Description
 
-The `run` command replays a recorded session while injecting security payloads into every input field. It uses configured detection plugins to identify vulnerabilities and can generate detailed security reports.
+The `run` command loads the Vulcn project, discovers sessions from `sessions/`, loads payloads and detection plugins based on `.vulcn.yml`, and replays every session while injecting security payloads into injectable input fields.
 
-It supports both **legacy single-file sessions** (`.vulcn.yml`) and **v2 session directories** (`.vulcn/`) containing multiple sessions with shared configuration.
+Authentication is auto-discovered from `auth/state.enc` — no `--creds` flag needed.
 
-Payloads are fetched from [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) — the largest community-curated collection of security payloads.
+Payloads are curated and context-aware, with community payloads from [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) available as an opt-in.
+
+## How It Works
+
+1. Reads all config from `.vulcn.yml`
+2. Loads sessions from `sessions/`
+3. CLI flags override config values for this run only
+4. Auto-discovers auth from `auth/state.enc`
+5. Loads payloads and detection plugins via `PluginManager.loadFromConfig()`
+6. Executes tiered scanning
+7. Saves reports to `reports/`
 
 ## Tiered Scanning
 
@@ -74,21 +81,21 @@ Additional aliases: `sql` → `sql-injection`, `command` → `command-injection`
 ### Default Run
 
 ```bash
-vulcn run session.vulcn.yml
+vulcn run
 ```
 
-Runs with `xss` payloads and the default `@vulcn/plugin-detect-xss` detection.
+Reads everything from `.vulcn.yml` — payload types, detection settings, browser config.
 
-### Multiple Payload Types
+### Override Payload Types
 
 ```bash
-vulcn run session.vulcn.yml -p xss sqli cmd
+vulcn run -p xss sqli cmd
 ```
 
 ### Custom Payload File
 
 ```bash
-vulcn run session.vulcn.yml -f ./my-payloads.yml
+vulcn run -f ./my-payloads.yml
 ```
 
 Custom payload file format:
@@ -108,7 +115,7 @@ payloads:
 ### Visible Browser
 
 ```bash
-vulcn run session.vulcn.yml --no-headless
+vulcn run --no-headless
 ```
 
 Watch the browser as tests run. Useful for debugging.
@@ -116,11 +123,14 @@ Watch the browser as tests run. Useful for debugging.
 ### Authenticated Scanning
 
 ```bash
-# Scan with stored credentials
-vulcn run session.vulcn.yml --creds .vulcn/auth.enc -p xss
+# Store credentials first
+vulcn store admin password
+
+# Run — auth is auto-discovered from auth/state.enc
+vulcn run -p xss sqli
 ```
 
-When `--creds` is provided, Vulcn will:
+When `auth/state.enc` is found, Vulcn will:
 
 1. Decrypt the credentials file using `VULCN_KEY` or an interactive prompt
 2. Perform a fresh login to capture browser storage state
@@ -130,21 +140,23 @@ When `--creds` is provided, Vulcn will:
 ### Full DVWA Workflow
 
 ```bash
-# 1. Store DVWA credentials
-vulcn store admin password --login-url http://localhost:8080/login.php
+# 1. Initialize project
+vulcn init http://localhost:8080
 
-# 2. Crawl authenticated pages
-vulcn crawl http://localhost:8080 --creds .vulcn/auth.enc
+# 2. Store DVWA credentials
+vulcn store admin password
 
-# 3. Scan the XSS reflected form
-vulcn run sessions/07-crawl-vulnerabilities-xss-r-form-7-name.vulcn.yml \
-  --creds .vulcn/auth.enc -p xss -r html
+# 3. Crawl authenticated pages
+vulcn crawl
+
+# 4. Scan with XSS payloads and generate HTML report
+vulcn run -p xss -r html
 ```
 
 ### Different Browser
 
 ```bash
-vulcn run session.vulcn.yml --browser firefox
+vulcn run -b firefox
 ```
 
 ## Generating Reports
@@ -154,7 +166,7 @@ Generate security reports alongside your test run:
 ### HTML Report
 
 ```bash
-vulcn run session.vulcn.yml --report html
+vulcn run -r html
 ```
 
 Generates a modern, dark-themed HTML dashboard with risk gauges, severity breakdowns, and expandable finding cards. The report automatically opens in your browser.
@@ -162,7 +174,7 @@ Generates a modern, dark-themed HTML dashboard with risk gauges, severity breakd
 ### JSON Report (for CI/CD)
 
 ```bash
-vulcn run session.vulcn.yml --report json
+vulcn run -r json
 ```
 
 Produces a machine-readable JSON file for pipeline integration, SIEM ingestion, or custom tooling.
@@ -170,7 +182,7 @@ Produces a machine-readable JSON file for pipeline integration, SIEM ingestion, 
 ### All Formats
 
 ```bash
-vulcn run session.vulcn.yml --report all --report-output ./reports
+vulcn run -r all --report-output ./reports
 ```
 
 Generates HTML, JSON, YAML, and SARIF reports in the specified output directory.
@@ -178,7 +190,7 @@ Generates HTML, JSON, YAML, and SARIF reports in the specified output directory.
 ### SARIF Report (for GitHub Code Scanning)
 
 ```bash
-vulcn run session.vulcn.yml --report sarif
+vulcn run -r sarif
 ```
 
 Produces a [SARIF v2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) file with CWE mappings—upload directly to GitHub Code Scanning:
@@ -186,19 +198,19 @@ Produces a [SARIF v2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v
 ```yaml
 # .github/workflows/vulcn.yml
 - name: Run Vulcn
-  run: vulcn run session.vulcn.yml -p xss sqli -r sarif
+  run: vulcn run -p xss sqli -r sarif
 
 - name: Upload SARIF
   uses: github/codeql-action/upload-sarif@v3
   if: always()
   with:
-    sarif_file: vulcn-report.sarif
+    sarif_file: reports/vulcn-report.sarif
     category: vulcn-dast
 ```
 
 <Tip>
   Combine reports with multiple payload types for comprehensive scans: ```bash
-  vulcn run session.vulcn.yml -p xss sqli -r html ```
+  vulcn run -p xss sqli -r html ```
 </Tip>
 
 ## Passive Security Scanning
@@ -207,10 +219,10 @@ Add `--passive` to analyze HTTP responses for security misconfigurations without
 
 ```bash
 # Active + passive scanning
-vulcn run session.vulcn.yml -p xss --passive -r html
+vulcn run -p xss --passive -r html
 
 # Full security assessment
-vulcn run session.vulcn.yml -p xss sqli --passive -r sarif
+vulcn run -p xss sqli --passive -r sarif
 ```
 
 The passive scanner detects missing security headers (HSTS, CSP), insecure cookies, information disclosure, CORS misconfigurations, and mixed content. See [`@vulcn/plugin-passive`](/plugins/plugin-passive) for details.
@@ -223,12 +235,13 @@ When vulnerabilities are detected:
 
 ```bash
 🔍 Running security tests
+   Target: https://example.com
    Sessions: 1 (Login Flow Test)
    Payloads: xss, sqli
    Payload count: 100
    Browser: chromium
    Headless: true
-   Auth: authenticated (storage state loaded)
+   Auth: authenticated
 
 ⚠️  FINDING: XSS Confirmed: alert() executed
    Step: step_003
@@ -271,7 +284,7 @@ When vulnerabilities are detected:
   The exit code indicates **tool success**, not whether vulnerabilities were found. To gate CI/CD pipelines on findings, check the report output:
 
 ```bash
-vulcn run session.vulcn.yml --report json --report-output ./reports
+vulcn run -r json --report-output ./reports
 FINDINGS=$(jq '.summary.totalFindings' reports/vulcn-report.json)
 [ "$FINDINGS" -gt 0 ] && exit 1
 ```
@@ -280,18 +293,14 @@ FINDINGS=$(jq '.summary.totalFindings' reports/vulcn-report.json)
 
 ## Detection Plugins
 
-The `run` command automatically loads detection plugins based on the payload types used:
+The `run` command automatically loads detection plugins based on the `.vulcn.yml` config:
 
 - **`@vulcn/plugin-detect-xss`** — Always loaded. Detects XSS by monitoring dialogs and console markers.
 - **`@vulcn/plugin-detect-sqli`** — Auto-loaded when `sqli` payloads are used. Detects SQL injection via error patterns, timing, and response diffing.
+- **`@vulcn/plugin-detect-reflection`** — Loaded when `detection.reflection.enabled` is true.
+- **`@vulcn/plugin-passive`** — Loaded when `detection.passive` is true or `--passive` flag is used.
 
-For more detection capabilities, add additional plugins:
-
-```bash
-vulcn plugin add @vulcn/plugin-detect-reflection
-```
-
-See [Plugins](/plugins/overview) for more information, or check out the [Report Plugin](/plugins/plugin-report) for report generation options.
+See [Plugins](/plugins/overview) for more information.
 
 ## See Also
 

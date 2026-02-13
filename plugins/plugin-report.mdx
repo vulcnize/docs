@@ -55,7 +55,7 @@ pnpm add @vulcn/plugin-report
 ### Generate an HTML Report
 
 ```bash
-vulcn run session.vulcn.yml --report html
+vulcn run --report html
 ```
 
 The HTML report is saved to the current directory and automatically opens in your browser.
@@ -63,13 +63,13 @@ The HTML report is saved to the current directory and automatically opens in you
 ### Generate JSON for CI/CD
 
 ```bash
-vulcn run session.vulcn.yml --report json
+vulcn run --report json
 ```
 
 ### Generate SARIF for GitHub Code Scanning
 
 ```bash
-vulcn run session.vulcn.yml --report sarif
+vulcn run --report sarif
 ```
 
 Produces a SARIF v2.1.0 file compatible with GitHub Code Scanning, Azure DevOps, and other SARIF-consuming tools.
@@ -77,13 +77,13 @@ Produces a SARIF v2.1.0 file compatible with GitHub Code Scanning, Azure DevOps,
 ### Generate All Formats
 
 ```bash
-vulcn run session.vulcn.yml --report all
+vulcn run --report all
 ```
 
 ### Custom Output Directory
 
 ```bash
-vulcn run session.vulcn.yml --report sarif --report-output ./reports
+vulcn run --report sarif --report-output ./reports
 ```
 
 ## CLI Options
@@ -95,14 +95,11 @@ vulcn run session.vulcn.yml --report sarif --report-output ./reports
 
 ## Configuration
 
-### Via `vulcn.config.yml`
+### Via `.vulcn.yml`
 
 ```yaml
-plugins:
-  - name: "@vulcn/plugin-report"
-    config:
-      format: sarif
-      outputDir: ./reports
+report:
+  format: sarif
 ```
 
 ### Config Options
@@ -266,7 +263,7 @@ jobs:
 
       - name: Run security scan
         run: |
-          vulcn run session.vulcn.yml \
+          vulcn run \
             -p xss sqli \
             -r sarif \
             --report-output .
@@ -289,7 +286,7 @@ jobs:
 ```yaml
 security_scan:
   script:
-    - vulcn run session.vulcn.yml --report json --report-output ./reports
+    - vulcn run --report json --report-output ./reports
   artifacts:
     paths:
       - reports/
@@ -307,7 +304,7 @@ security_scan:
 The exit code indicates **tool success**, not whether vulnerabilities were found. To gate deployments on findings, check the report output:
 
 ```bash
-vulcn run session.vulcn.yml --report json --report-output ./reports
+vulcn run --report json --report-output ./reports
 
 # Check findings count from the JSON report
 FINDINGS=$(jq '.summary.totalFindings' reports/vulcn-report.json)

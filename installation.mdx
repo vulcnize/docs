@@ -2,7 +2,7 @@
 title: "Installation"
 seo:
   title: "Install Vulcn — Modern Penetration Testing CLI Setup"
-  description: "Install the Vulcn security testing CLI, set up Playwright browsers, and configure plugins for automated penetration testing."
+  description: "Install the Vulcn security testing CLI, set up Playwright browsers, and initialize a project for automated penetration testing."
 description: "Install Vulcn and set up your environment for security testing"
 ---
 
@@ -35,7 +35,7 @@ Verify the installation:
 
 ```bash
 vulcn --version
-# Output: 0.3.0
+# Output: 0.5.0
 ```
 
 ## Install Browsers
@@ -64,45 +64,78 @@ vulcn doctor
 Output:
 
 ```bash
-🔍 Checking Vulcn environment...
+🩺 Vulcn Browser Check
 
-✓ Node.js v22.0.0
-✓ Vulcn CLI v0.3.0
-✓ Chromium installed
-✗ Firefox not installed
-✗ WebKit not installed
+System Browsers:
+  Chrome:    ✓ Available
+  Edge:      ✗ Not found
 
-Run 'vulcn install --all' to install missing browsers.
+Playwright Browsers:
+  Chromium:  ✓ Installed
+  Firefox:   ✗ Not installed
+  WebKit:    ✗ Not installed
+
+✅ Ready to use! Vulcn will use your system browser.
 ```
 
-## Initialize Configuration
+## Initialize a Project
 
-Create a `vulcn.config.yml` file with default settings:
+Create a `.vulcn.yml` project config:
 
 ```bash
-vulcn init
+vulcn init https://your-target.com
 ```
 
-This creates a configuration file with the official plugins pre-configured:
+This creates a configuration file and `sessions/` directory:
 
 ```yaml
-# vulcn.config.yml
-version: "1"
-plugins:
-  - name: "@vulcn/plugin-payloads"
-  - name: "@vulcn/plugin-detect-xss"
-    config:
-      detectDialogs: true
-      detectConsole: true
-      severity: high
-settings:
+# .vulcn.yml
+target: https://your-target.com
+
+scan:
   browser: chromium
   headless: true
+  timeout: 30000
+
+payloads:
+  types:
+    - xss
+
+detection:
+  xss:
+    dialogs: true
+    console: true
+    severity: high
+  reflection:
+    enabled: true
+  passive: true
+
+crawl:
+  depth: 2
+  maxPages: 20
+  sameOrigin: true
+
+report:
+  format: html
 ```
 
 <Tip>
   You can run `vulcn init --force` to overwrite an existing configuration file.
 </Tip>
+
+## Project Structure
+
+After initialization, your project looks like:
+
+```
+my-project/
+├── .vulcn.yml          ← single source of truth
+├── sessions/           ← recorded/crawled sessions (auto-created)
+├── auth/               ← encrypted credentials (auto-created)
+└── reports/            ← generated reports (auto-created)
+```
+
+All Vulcn commands auto-discover `.vulcn.yml` by walking up from the current directory.
 
 ## Programmatic Usage
 
@@ -127,21 +160,30 @@ yarn add @vulcn/engine
 Example:
 
 ```typescript
-import { DriverManager, PluginManager } from "@vulcn/engine";
+import {
+  DriverManager,
+  PluginManager,
+  parseProjectConfig,
+} from "@vulcn/engine";
+import browserDriver from "@vulcn/driver-browser";
 
 const drivers = new DriverManager();
-const plugins = new PluginManager();
-
-// Load browser driver
-await drivers.load("@vulcn/driver-browser");
+drivers.register(browserDriver);
 
 // Parse session from YAML
 const session = drivers.parseSession(sessionYaml);
 
-// Execute with plugin detection
-const result = await drivers.execute(session, plugins);
+// Load plugins from config
+const plugins = new PluginManager();
+const config = parseProjectConfig({ payloads: { types: ["xss"] } });
+await plugins.loadFromConfig(config);
 
-console.log(`Found ${result.findings.length} vulnerabilities`);
+// Execute scan
+const result = await drivers.executeScan([session], plugins, {
+  headless: true,
+});
+
+console.log(`Found ${result.aggregate.findings.length} vulnerabilities`);
 ```
 
 ## Uninstall

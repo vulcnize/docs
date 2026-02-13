@@ -38,14 +38,11 @@ npm install @vulcn/driver-browser
 ### Example Configuration
 
 ```yaml
-# vulcn.config.yml
-settings:
-  driver: browser
-  driverConfig:
-    browser: chromium
-    viewport:
-      width: 1920
-      height: 1080
+# .vulcn.yml
+scan:
+  browser: chromium
+  headless: true
+  timeout: 30000
 ```
 
 ## Step Types
@@ -289,11 +286,11 @@ const sessions = await manager.crawl(
 
 console.log(`Found ${sessions.length} injectable forms`);
 
-// Execute each session with payloads
-for (const session of sessions) {
-  const result = await manager.execute(session, pluginManager);
-  console.log(`${session.name}: ${result.findings.length} findings`);
-}
+// Execute all sessions with payloads
+const result = await manager.executeScan(sessions, pluginManager, {
+  headless: true,
+});
+console.log(`Found ${result.aggregate.findings.length} findings`);
 ```
 
 ### Direct Access (with CapturedRequests)
@@ -365,11 +362,11 @@ if (!alive) {
 # 1. Store credentials (AES-256-GCM encrypted)
 vulcn store admin password --login-url http://localhost:8080/login.php
 
-# 2. Crawl with authentication
-vulcn crawl http://localhost:8080 --creds .vulcn/auth.enc
+# 2. Crawl with authentication (auth auto-discovered from auth/state.enc)
+vulcn crawl
 
-# 3. Scan with authentication
-vulcn run sessions/form.vulcn.yml --creds .vulcn/auth.enc -p xss -r html
+# 3. Scan with authentication (auth auto-discovered)
+vulcn run -p xss -r html
 ```
 
 ## Programmatic Usage
@@ -399,22 +396,28 @@ console.log(session.steps);
 ### Running
 
 ```typescript
-import { driverManager, pluginManager } from "@vulcn/engine";
+import {
+  DriverManager,
+  PluginManager,
+  parseProjectConfig,
+} from "@vulcn/engine";
 import browserDriver from "@vulcn/driver-browser";
-import payloadsPlugin from "@vulcn/plugin-payloads";
 
-// Register driver and plugins
-driverManager.register(browserDriver);
-pluginManager.addPlugin(payloadsPlugin);
-await pluginManager.initialize();
+// Register driver and load config
+const drivers = new DriverManager();
+drivers.register(browserDriver);
 
-// Execute session
-const result = await driverManager.execute(session, pluginManager, {
+const manager = new PluginManager();
+const config = parseProjectConfig({ payloads: { types: ["xss"] } });
+await manager.loadFromConfig(config);
+
+// Execute scan
+const result = await drivers.executeScan([session], manager, {
   headless: true,
   onFinding: (finding) => console.log("Found:", finding.title),
 });
 
-console.log(`Found ${result.findings.length} vulnerabilities`);
+console.log(`Found ${result.aggregate.findings.length} vulnerabilities`);
 ```
 
 ## Detection
@@ -426,37 +429,21 @@ During replay, the browser driver monitors for:
 - **Payload Reflection** - Payload strings appearing in page content (Tier 2)
 - **HTTP Reflection** - Payload patterns in HTTP response bodies (Tier 1)
 
-These detections are enhanced when combined with detection plugins:
+These detections are enhanced when combined with detection plugins configured in `.vulcn.yml`:
 
 ```yaml
-plugins:
-  - name: "@vulcn/plugin-detect-xss"
-  - name: "@vulcn/plugin-detect-sqli"
-  - name: "@vulcn/plugin-detect-reflection"
+# .vulcn.yml
+detection:
+  xss:
+    dialogs: true
+    console: true
+  reflection:
+    enabled: true
 ```
 
-## Session Formats
+## Session Format
 
-### v2 Session Directory (recommended)
-
-The v2 format uses a `.vulcn/` directory with a manifest:
-
-```
-my-scan.vulcn/
-├── manifest.yml          # Scan config, session list, auth config
-├── auth/
-│   ├── config.yml        # Login strategy, indicators
-│   └── state.enc         # Encrypted storageState
-├── sessions/
-│   ├── search-form.yml   # Individual session file
-│   └── login-form.yml
-└── requests/
-    └── search-form.json  # HTTP metadata for Tier 1 scanning
-```
-
-### v1 Session File (legacy)
-
-Single YAML file containing everything:
+Sessions are YAML files with a `driver:` field:
 
 ```yaml
 name: Login Form Test
@@ -464,31 +451,23 @@ driver: browser
 driverConfig:
   browser: chromium
   startUrl: https://vulnerable-app.example.com/login
-  viewport:
-    width: 1280
-    height: 720
 steps:
   - id: step_001
     type: browser.navigate
     url: https://vulnerable-app.example.com/login
-    timestamp: 0
 
   - id: step_002
     type: browser.input
     selector: "#username"
     value: admin
     injectable: true
-    timestamp: 1200
 
   - id: step_003
     type: browser.click
     selector: button[type="submit"]
-    timestamp: 3000
-
-metadata:
-  recordedAt: "2026-02-06T12:00:00Z"
-  version: "2"
 ```
+
+Sessions are stored in `sessions/` and auto-discovered by `vulcn run`.
 
 <Card title="Plugin System" icon="plug" href="/plugins/overview">
   Learn how to add detection plugins for comprehensive vulnerability scanning

@@ -2,7 +2,7 @@
 title: "CLI Overview"
 seo:
   title: "Vulcn CLI Reference — Commands for Security Testing"
-  description: "Complete reference for the Vulcn CLI: record sessions, run penetration tests, manage payloads and plugins, and generate security reports."
+  description: "Complete reference for the Vulcn CLI: initialize projects, record sessions, run penetration tests, manage payloads, and generate security reports."
 description: "Complete reference for all Vulcn CLI commands"
 ---
 
@@ -22,80 +22,60 @@ vulcn [command] [options]
 ## Commands
 
 <CardGroup cols={2}>
-  <Card title="record" icon="circle-dot" href="/cli/record">
-    Record browser interactions into a session file
+  <Card title="init" icon="wand-magic-sparkles" href="/cli/init">
+    Create a .vulcn.yml project config
   </Card>
-  <Card title="store" icon="lock" href="/cli/store">
-    Store encrypted credentials for authenticated scans
+  <Card title="record" icon="circle-dot" href="/cli/record">
+    Record browser interactions into sessions/
   </Card>
   <Card title="crawl" icon="spider" href="/cli/crawl">
     Auto-discover forms and injection points
   </Card>
   <Card title="run" icon="play" href="/cli/run">
-    Run security tests on a recorded session
+    Run security tests (reads from .vulcn.yml)
+  </Card>
+  <Card title="store" icon="lock" href="/cli/store">
+    Store encrypted credentials to auth/
   </Card>
   <Card title="payloads" icon="syringe" href="/cli/payloads">
     List available payload types
-  </Card>
-  <Card title="plugin" icon="plug" href="/cli/plugin">
-    Manage plugins in your configuration
-  </Card>
-  <Card title="init" icon="wand-magic-sparkles" href="/cli/init">
-    Create a vulcn.config.yml file
-  </Card>
-  <Card title="install" icon="download" href="/cli/record">
-    Install Playwright browsers
   </Card>
 </CardGroup>
 
 ## Quick Reference
 
-| Command                      | Description                    |
-| ---------------------------- | ------------------------------ |
-| `vulcn record <url>`         | Record browser interactions    |
-| `vulcn store [user] [pass]`  | Store encrypted credentials    |
-| `vulcn crawl <url>`          | Auto-discover forms and inputs |
-| `vulcn run <session>`        | Run security tests             |
-| `vulcn payloads`             | List available payload types   |
-| `vulcn plugin list`          | List configured plugins        |
-| `vulcn plugin add <name>`    | Add a plugin                   |
-| `vulcn plugin remove <name>` | Remove a plugin                |
-| `vulcn init`                 | Create config file             |
-| `vulcn install`              | Install browsers               |
-| `vulcn doctor`               | Check environment              |
+| Command                     | Description                    |
+| --------------------------- | ------------------------------ |
+| `vulcn init [url]`          | Create `.vulcn.yml` project    |
+| `vulcn record [url]`        | Record browser interactions    |
+| `vulcn crawl [url]`         | Auto-discover forms and inputs |
+| `vulcn run`                 | Run security tests             |
+| `vulcn store [user] [pass]` | Store encrypted credentials    |
+| `vulcn payloads`            | List available payload types   |
+| `vulcn install`             | Install browsers               |
+| `vulcn doctor`              | Check environment              |
+
+<Note>
+  Most commands read configuration from `.vulcn.yml`. CLI flags override config
+  values for that run only.
+</Note>
 
 ## Examples
 
 ### Basic Workflow
 
 ```bash
-# Initialize configuration
-vulcn init
+# Initialize project
+vulcn init https://example.com
 
-# Record a session
-vulcn record https://example.com -o session.vulcn.yml
+# Auto-discover forms
+vulcn crawl
 
-# Run with default payloads
-vulcn run session.vulcn.yml
+# Run with default payloads from .vulcn.yml
+vulcn run
 
-# Run with specific payload types
-vulcn run session.vulcn.yml -p xss sqli
-```
-
-### Plugin Management
-
-```bash
-# List configured plugins
-vulcn plugin list
-
-# Add a detection plugin
-vulcn plugin add @vulcn/plugin-detect-reflection
-
-# Disable a plugin temporarily
-vulcn plugin disable @vulcn/plugin-detect-xss
-
-# Remove a plugin
-vulcn plugin remove @vulcn/plugin-detect-reflection
+# Override payload types for this run
+vulcn run -p xss sqli
 ```
 
 ### Browser Management
@@ -109,20 +89,29 @@ vulcn install
 
 # Install all browsers
 vulcn install --all
-
-# Use Firefox for recording
-vulcn record https://example.com --browser firefox
 ```
 
 ### Authenticated Scanning
 
 ```bash
-# Store credentials for a target
-vulcn store admin password --login-url https://app.example.com/login
+# Store credentials (encrypted to auth/state.enc)
+vulcn store admin password
 
-# Crawl authenticated pages
-vulcn crawl https://app.example.com --creds .vulcn/auth.enc
+# Crawl authenticated pages (auth auto-discovered)
+vulcn crawl
 
-# Run authenticated scans
-vulcn run sessions/01-form.vulcn.yml --creds .vulcn/auth.enc -p xss sqli
+# Run authenticated scans (auth auto-discovered)
+vulcn run -p xss sqli -r html
+```
+
+### Project Structure
+
+All commands work with the convention-based project structure:
+
+```
+my-project/
+├── .vulcn.yml          ← config (single source of truth)
+├── sessions/           ← recorded/crawled sessions
+├── auth/               ← encrypted credentials
+└── reports/            ← generated reports
 ```

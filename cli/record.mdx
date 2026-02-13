@@ -1,129 +1,120 @@
 ---
 title: "vulcn record"
+seo:
+  title: "vulcn record — Record Browser Interactions Into Sessions"
+  description: "Record browser interactions into replayable session files for automated security testing with Vulcn."
 description: "Record browser interactions into a session file"
 ---
 
 ## Usage
 
 ```bash
-vulcn record <url> [options]
+vulcn record [url] [options]
 ```
 
 ## Arguments
 
-| Argument | Description                 | Required |
-| -------- | --------------------------- | -------- |
-| `url`    | Starting URL to record from | Yes      |
+| Argument | Description                                     | Required |
+| -------- | ----------------------------------------------- | -------- |
+| `url`    | Target URL (overrides `target` in `.vulcn.yml`) | No       |
 
 ## Options
 
-| Option                    | Description                                | Default             |
-| ------------------------- | ------------------------------------------ | ------------------- |
-| `-o, --output <file>`     | Output file path                           | `session.vulcn.yml` |
-| `-b, --browser <browser>` | Browser to use (chromium, firefox, webkit) | `chromium`          |
-| `--headless`              | Run in headless mode                       | `false`             |
-| `--auto`                  | Auto-crawl: discover forms automatically   | `false`             |
-| `--depth <number>`        | Max crawl depth (with `--auto`)            | `2`                 |
-| `--max-pages <number>`    | Max pages to crawl (with `--auto`)         | `20`                |
+| Option                    | Description                                | Default        |
+| ------------------------- | ------------------------------------------ | -------------- |
+| `-o, --output <file>`     | Output filename (saved to `sessions/`)     | auto-generated |
+| `-b, --browser <browser>` | Browser to use (chromium, firefox, webkit) | from config    |
+| `--headless`              | Run in headless mode                       | `false`        |
 
 ## Description
 
-The `record` command opens a browser window and captures your interactions with a web application. Every click, form input, and navigation is recorded into a session file that can be replayed with security payloads.
+The `record` command reads the target URL from `.vulcn.yml` (or a CLI argument), opens a browser, and captures your interactions. Every click, form input, and navigation is recorded into a session file that is saved to the `sessions/` directory. Press **Ctrl+C** to stop recording.
 
-With the `--auto` flag, Vulcn skips manual recording and instead automatically crawls the target URL to discover forms and injectable inputs — similar to a web application spider.
+## How It Works
+
+1. Reads target URL from `.vulcn.yml` (or CLI arg)
+2. Opens the browser and records every interaction
+3. Press **Ctrl+C** to stop and save to `sessions/`
+4. Run `vulcn run` to replay with security payloads
 
 ## Examples
 
 ### Basic Recording
 
 ```bash
+vulcn record
+```
+
+Opens the browser at the `target` URL from `.vulcn.yml`, records your interactions, and saves to `sessions/`.
+
+### Override Target URL
+
+```bash
 vulcn record https://example.com
 ```
 
-This opens Chromium, records your interactions, and saves to `session.vulcn.yml`.
-
-### Auto-Crawl
+### Custom Output Filename
 
 ```bash
-# Discover forms automatically (no manual interaction needed)
-vulcn record https://example.com --auto
-
-# Control crawl depth and scope
-vulcn record https://example.com --auto --depth 3 --max-pages 50
+vulcn record -o login-flow.yml
 ```
 
-Auto-crawl generates one session per discovered injectable form, each with `navigate → input → submit` steps.
-
-### Custom Output File
-
-```bash
-vulcn record https://example.com --output login-flow.vulcn.yml
-```
+This saves to `sessions/login-flow.yml`.
 
 ### Use Firefox
 
 ```bash
-vulcn record https://example.com --browser firefox
-```
-
-### Headless Recording
-
-<Warning>
-  Headless recording is generally not recommended as you can't see what you're
-  recording. It's useful for automated scenarios where you control the page
-  programmatically.
-</Warning>
-
-```bash
-vulcn record https://example.com --headless
+vulcn record -b firefox
 ```
 
 ## Session File Format
 
-The recorded session is saved as a YAML file:
+The recorded session is saved as a YAML file with the driver format:
 
 ```yaml
-name: Session 2026-02-06
-startUrl: https://example.com
-browser: chromium
+# sessions/recording-2026-02-14.yml
+name: Session 2026-02-14
+driver: browser
+driverConfig:
+  startUrl: https://example.com
+  browser: chromium
 steps:
   - id: step_001
-    type: navigate
+    type: browser.navigate
     url: https://example.com
-    timestamp: 1707192000000
 
   - id: step_002
-    type: click
+    type: browser.click
     selector: "#login-button"
-    timestamp: 1707192005000
 
   - id: step_003
-    type: fill
+    type: browser.input
     selector: "input[name='username']"
     value: testuser
-    timestamp: 1707192010000
+    injectable: true
 
   - id: step_004
-    type: fill
+    type: browser.input
     selector: "input[name='password']"
     value: "********"
-    timestamp: 1707192015000
+    injectable: true
 
   - id: step_005
-    type: click
+    type: browser.click
     selector: "button[type='submit']"
-    timestamp: 1707192020000
 ```
 
 ## Step Types
 
-| Type       | Description        | Fields              |
-| ---------- | ------------------ | ------------------- |
-| `navigate` | Page navigation    | `url`               |
-| `click`    | Mouse click        | `selector`          |
-| `fill`     | Text input         | `selector`, `value` |
-| `select`   | Dropdown selection | `selector`, `value` |
-| `check`    | Checkbox toggle    | `selector`          |
+| Type               | Description        | Fields              |
+| ------------------ | ------------------ | ------------------- |
+| `browser.navigate` | Page navigation    | `url`               |
+| `browser.click`    | Mouse click        | `selector`          |
+| `browser.input`    | Text input         | `selector`, `value` |
+| `browser.select`   | Dropdown selection | `selector`, `value` |
+| `browser.check`    | Checkbox toggle    | `selector`          |
+
+Steps with `injectable: true` are targeted by the scanner for payload injection during `vulcn run`.
 
 ## Tips
 
@@ -142,3 +133,8 @@ steps:
   Vulcn automatically masks password fields in the session file. The actual
   values are not stored—only that a password field was filled.
 </Note>
+
+## See Also
+
+- [vulcn crawl](/cli/crawl) — Auto-discover forms instead of recording manually
+- [vulcn run](/cli/run) — Run security tests on recorded sessions

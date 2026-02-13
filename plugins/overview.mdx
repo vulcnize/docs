@@ -83,46 +83,41 @@ Vulcn's plugin system allows you to extend its capabilities with custom detectio
 
 ## Configuration
 
-Plugins are configured in `vulcn.config.yml`:
+Plugins are configured automatically via flat keys in `.vulcn.yml` — no plugin array or manual management needed:
 
 ```yaml
-plugins:
-  - name: "@vulcn/plugin-payloads"
+# .vulcn.yml
+payloads:
+  types:
+    - xss
+    - sqli
 
-  - name: "@vulcn/plugin-detect-xss"
-    config:
-      detectDialogs: true
-      severity: high
+detection:
+  xss:
+    dialogs: true
+    severity: high
+  reflection:
+    enabled: true
+  passive: true
+
+report:
+  format: html
 ```
 
-## Managing Plugins
+The engine maps these flat config keys to the correct internal plugins. See [How Plugins Work](/config/plugins) for the full mapping table.
 
-Use the CLI to manage plugins:
+## Auto-Loading
 
-```bash
-# List configured plugins
-vulcn plugin list
+When you run `vulcn run`, the `PluginManager` automatically loads plugins based on your `.vulcn.yml`:
 
-# Add a plugin
-vulcn plugin add @vulcn/plugin-detect-reflection
+1. **`@vulcn/plugin-payloads`** — Always loaded, config from `payloads.*`
+2. **`@vulcn/plugin-detect-xss`** — Always loaded, config from `detection.xss.*`
+3. **`@vulcn/plugin-detect-sqli`** — Auto-loaded when `sqli` is in `payloads.types`
+4. **`@vulcn/plugin-detect-reflection`** — Loaded when `detection.reflection.enabled` is true
+5. **`@vulcn/plugin-passive`** — Loaded when `detection.passive` is true
+6. **`@vulcn/plugin-report`** — Loaded when `report.format` is set
 
-# Remove a plugin
-vulcn plugin remove @vulcn/plugin-detect-reflection
-
-# Enable/disable
-vulcn plugin enable @vulcn/plugin-detect-xss
-vulcn plugin disable @vulcn/plugin-detect-xss
-```
-
-## Default Plugins
-
-When you run `vulcn run` without a config file, the CLI automatically loads:
-
-1. **Payloads**: Fetches `xss` payloads from PayloadsAllTheThings
-2. **XSS Detection**: Loads `@vulcn/plugin-detect-xss`
-3. **SQLi Detection**: Loads `@vulcn/plugin-detect-sqli` when `sqli` payloads are used
-
-This ensures Vulcn is useful out of the box.
+This ensures Vulcn is useful out of the box with zero configuration.
 
 ## Plugin Lifecycle
 

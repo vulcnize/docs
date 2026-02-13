@@ -1,255 +1,120 @@
 ---
-title: "Plugin Configuration"
-description: "Configure plugins in vulcn.config.yml"
+title: "How Plugins Work"
+seo:
+  title: "Vulcn Plugin Architecture — How Flat Config Maps to Plugins"
+  description: "Learn how Vulcn's flat .vulcn.yml configuration maps to internal plugins. No manual plugin management needed — the engine handles it automatically."
+description: "How .vulcn.yml flat config maps to internal plugins"
 ---
 
-## Plugins Array
+## No Plugin Configuration Required
 
-Plugins are configured in the `plugins` array:
-
-```yaml
-plugins:
-  - name: "@vulcn/plugin-payloads"
-    enabled: true
-
-  - name: "@vulcn/plugin-detect-xss"
-    config:
-      detectDialogs: true
-```
-
-## Plugin Entry Schema
-
-| Field     | Type    | Description                               |
-| --------- | ------- | ----------------------------------------- |
-| `name`    | string  | Plugin package name (required)            |
-| `config`  | object  | Plugin-specific configuration             |
-| `enabled` | boolean | Enable/disable the plugin (default: true) |
-
-## Official Plugins
-
-### @vulcn/plugin-payloads
-
-Handles all payload loading:
+Unlike traditional plugin systems, you **don't need to configure plugins in `.vulcn.yml`**. Vulcn uses a flat configuration file and automatically maps config keys to the correct internal plugins.
 
 ```yaml
-- name: "@vulcn/plugin-payloads"
-  config:
-    # Payload types to load
-    types:
-      - xss
-      - sqli
+# .vulcn.yml — flat config, no plugins array
+target: https://example.com
 
-    # Maximum payloads per type
-    limit: 50
+payloads:
+  types:
+    - xss
+    - sqli
 
-    # Load custom payload files
-    files:
-      - ./my-payloads.yml
-      - ./enterprise-payloads.json
-```
-
-| Option  | Type     | Default | Description                                   |
-| ------- | -------- | ------- | --------------------------------------------- |
-| `types` | string[] | -       | Payload types to load (accepts short aliases) |
-| `limit` | number   | `50`    | Maximum payloads per type                     |
-| `files` | string[] | -       | Custom payload file paths                     |
-
-### @vulcn/plugin-detect-xss
-
-Execution-based XSS detection:
-
-```yaml
-- name: "@vulcn/plugin-detect-xss"
-  config:
-    # Monitor dialogs (alert, confirm, prompt)
-    detectDialogs: true
-
-    # Monitor console markers
-    detectConsole: true
-
-    # Console marker prefix
-    consoleMarker: "VULCN_XSS:"
-
-    # DOM mutation detection (experimental)
-    detectDomMutation: false
-
-    # Alert patterns to match
-    alertPatterns:
-      - "XSS"
-      - "1"
-      - "document.domain"
-
-    # Finding severity
+detection:
+  xss:
+    dialogs: true
     severity: high
+  reflection:
+    enabled: true
+  passive: true
+
+report:
+  format: html
 ```
 
-| Option              | Type     | Default             | Description                  |
-| ------------------- | -------- | ------------------- | ---------------------------- |
-| `detectDialogs`     | boolean  | `true`              | Monitor alert/confirm/prompt |
-| `detectConsole`     | boolean  | `true`              | Detect console markers       |
-| `consoleMarker`     | string   | `"VULCN_XSS:"`      | Console marker prefix        |
-| `detectDomMutation` | boolean  | `false`             | Check for injected scripts   |
-| `alertPatterns`     | string[] | `["XSS", "1", ...]` | Patterns to match in alerts  |
-| `severity`          | string   | `"high"`            | Finding severity level       |
+The engine reads this config and automatically:
 
-### @vulcn/plugin-detect-sqli
+1. Loads `@vulcn/plugin-payloads` with the `payloads.*` settings
+2. Loads `@vulcn/plugin-detect-xss` with the `detection.xss.*` settings
+3. Loads `@vulcn/plugin-detect-sqli` when `sqli` is in payload types
+4. Loads `@vulcn/plugin-detect-reflection` when `detection.reflection.enabled` is true
+5. Loads `@vulcn/plugin-passive` when `detection.passive` is true
+6. Loads `@vulcn/plugin-report` when `report.format` is set
 
-SQL injection detection via error patterns, timing, and response diffing:
+## Config → Plugin Mapping
 
-```yaml
-- name: "@vulcn/plugin-detect-sqli"
-  config:
-    detectErrors: true
-    detectDiff: true
-    detectTiming: true
-    timingThresholdMs: 4000
-    errorSeverity: high
-    timingSeverity: high
-    diffSeverity: medium
-```
-
-| Option              | Type    | Default    | Description                            |
-| ------------------- | ------- | ---------- | -------------------------------------- |
-| `detectErrors`      | boolean | `true`     | Enable error-based detection           |
-| `detectDiff`        | boolean | `true`     | Enable response body diffing           |
-| `detectTiming`      | boolean | `true`     | Enable timing-based detection          |
-| `timingThresholdMs` | number  | `4000`     | Response time threshold for blind SQLi |
-| `errorSeverity`     | string  | `"high"`   | Severity for error-based findings      |
-| `timingSeverity`    | string  | `"high"`   | Severity for timing-based findings     |
-| `diffSeverity`      | string  | `"medium"` | Severity for diff-based findings       |
-
-<Tip>
-  The `@vulcn/plugin-detect-sqli` is auto-loaded when `sqli` payloads are used.
-  You only need to configure it manually if you want to customize its settings.
-</Tip>
-
-### @vulcn/plugin-detect-reflection
-
-Input reflection and output encoding detection:
-
-```yaml
-- name: "@vulcn/plugin-detect-reflection"
-  config:
-    # Detection modes
-    detectBody: true
-    detectScript: true
-    detectAttribute: true
-
-    # Minimum payload length to check
-    minPayloadLength: 4
-
-    # Severity by context
-    bodySeverity: low
-    scriptSeverity: medium
-    attributeSeverity: medium
-
-    # Dangerous patterns to watch for
-    dangerousPatterns:
-      - onerror
-      - onclick
-      - javascript:
-```
-
-| Option              | Type    | Default    | Description                         |
-| ------------------- | ------- | ---------- | ----------------------------------- |
-| `detectBody`        | boolean | `true`     | Detect reflection in HTML body      |
-| `detectScript`      | boolean | `true`     | Detect reflection in script context |
-| `detectAttribute`   | boolean | `true`     | Detect reflection in attributes     |
-| `minPayloadLength`  | number  | `4`        | Skip payloads shorter than this     |
-| `bodySeverity`      | string  | `"low"`    | Severity for body reflection        |
-| `scriptSeverity`    | string  | `"medium"` | Severity for script reflection      |
-| `attributeSeverity` | string  | `"medium"` | Severity for attribute reflection   |
-
-### @vulcn/plugin-passive
-
-Passive security scanner (no payload injection):
-
-```yaml
-- name: "@vulcn/plugin-passive"
-  config:
-    # Enable/disable specific checks
-    detectHeaders: true
-    detectCookies: true
-    detectInfoLeak: true
-    detectCors: true
-    detectMixed: true
-
-    # Severity overrides
-    headerSeverity: medium
-    corsSeverity: high
-```
-
-| Option                 | Type    | Default  | Description                              |
-| ---------------------- | ------- | -------- | ---------------------------------------- |
-| `detectHeaders`        | boolean | `true`   | Check for missing security headers       |
-| `detectCookies`        | boolean | `true`   | Check for insecure cookie configurations |
-| `detectInfoLeak`       | boolean | `true`   | Check for information disclosure         |
-| `detectCors`           | boolean | `true`   | Check for CORS misconfigurations         |
-| `detectMixed`          | boolean | `true`   | Check for mixed content (HTTP on HTTPS)  |
-| `headerSeverity`       | string  | `medium` | Severity for missing headers             |
-| `cookieSeverity`       | string  | `medium` | Severity for cookie issues               |
-| `infoLeakSeverity`     | string  | `low`    | Severity for information disclosure      |
-| `corsSeverity`         | string  | `high`   | Severity for CORS misconfigurations      |
-| `mixedContentSeverity` | string  | `medium` | Severity for mixed content               |
-
-<Tip>
-  Use `--passive` on the CLI to auto-load this plugin without editing your
-  config. See the [Passive Scanner docs](/plugins/plugin-passive) for full
-  details.
-</Tip>
-
-### @vulcn/plugin-report
-
-Security report generation (HTML, JSON, YAML, SARIF):
-
-```yaml
-- name: "@vulcn/plugin-report"
-  config:
-    # Output format: html, json, yaml, sarif, all
-    format: html
-
-    # Directory to write reports
-    outputDir: ./reports
-```
-
-| Option      | Type   | Default | Description                                           |
-| ----------- | ------ | ------- | ----------------------------------------------------- |
-| `format`    | string | `html`  | Report format: `html`, `json`, `yaml`, `sarif`, `all` |
-| `outputDir` | string | `.`     | Output directory for report files                     |
-
-<Tip>
-  The `--report` and `--report-output` CLI flags override the config file
-  settings. See the [Report Plugin docs](/plugins/plugin-report) for full
-  details.
-</Tip>
-
-## Disabling Plugins
-
-Temporarily disable a plugin without removing it:
-
-```yaml
-- name: "@vulcn/plugin-detect-reflection"
-  enabled: false
-  config:
-    detectBody: true
-```
-
-Or use the CLI:
-
-```bash
-vulcn plugin disable @vulcn/plugin-detect-reflection
-```
+| Config Key                  | Plugin Loaded                     | Condition                      |
+| --------------------------- | --------------------------------- | ------------------------------ |
+| `payloads.*`                | `@vulcn/plugin-payloads`          | Always                         |
+| `detection.xss.*`           | `@vulcn/plugin-detect-xss`        | Always                         |
+| `detection.reflection.*`    | `@vulcn/plugin-detect-reflection` | `detection.reflection.enabled` |
+| `detection.passive`         | `@vulcn/plugin-passive`           | `detection.passive: true`      |
+| `payloads.types` has `sqli` | `@vulcn/plugin-detect-sqli`       | `sqli` in types                |
+| `report.format`             | `@vulcn/plugin-report`            | format is not null             |
 
 ## Plugin Loading Order
 
-Plugins are loaded in the order they appear in the config file. This affects:
+Plugins are loaded in a fixed order that ensures correct execution:
 
-1. Payload loading (first payload plugin provides payloads first)
-2. Hook execution (hooks run in plugin order)
-3. Finding collection (findings accumulated in order)
-4. Report generation (report plugin uses `onRunEnd` to receive final results)
+1. **Payload plugin** — provides payloads before detection begins
+2. **Detection plugins** — run during scan execution (XSS, SQLi, reflection, passive)
+3. **Report plugin** — runs on `onRunEnd` to receive all findings
 
-<Tip>
-  Keep detection plugins after the payloads plugin so payloads are loaded before
-  detection begins. Place the report plugin last so it can access all findings.
-</Tip>
+This ordering is handled automatically by `PluginManager.loadFromConfig()`.
+
+## Official Plugins
+
+| Plugin                            | Description                                               |
+| --------------------------------- | --------------------------------------------------------- |
+| `@vulcn/plugin-payloads`          | Payload loading (curated, PayloadBox, custom files)       |
+| `@vulcn/plugin-detect-xss`        | Execution-based XSS detection (dialogs, console)          |
+| `@vulcn/plugin-detect-sqli`       | SQL injection detection (error, timing, diff)             |
+| `@vulcn/plugin-detect-reflection` | Input reflection & output encoding detection              |
+| `@vulcn/plugin-passive`           | Passive scanner — headers, cookies, info disclosure, CORS |
+| `@vulcn/plugin-report`            | HTML, JSON, YAML, and SARIF security report generation    |
+
+<Card title="Learn more about plugins" icon="plug" href="/plugins/overview">
+  See the complete plugin system documentation
+</Card>
+
+## Advanced: Programmatic Plugin Usage
+
+For programmatic usage, you can add plugins directly via the `PluginManager` API:
+
+```typescript
+import { PluginManager, parseProjectConfig } from "@vulcn/engine";
+import detectXss from "@vulcn/plugin-detect-xss";
+
+const manager = new PluginManager();
+
+// Option 1: Load from config (recommended)
+const config = parseProjectConfig({
+  payloads: { types: ["xss"] },
+  detection: { xss: { severity: "critical" } },
+});
+await manager.loadFromConfig(config);
+
+// Option 2: Add plugins manually
+manager.addPlugin(detectXss, {
+  detectDialogs: true,
+  severity: "critical",
+});
+
+await manager.initialize();
+```
+
+See the [PluginManager API](/api/plugin-manager) for details.
+
+## Disabling Detection
+
+To disable specific detection features, set them in `.vulcn.yml`:
+
+```yaml
+detection:
+  xss:
+    dialogs: true
+    console: false # Disable console marker detection
+    domMutation: false # Disable DOM mutation checks
+  reflection:
+    enabled: false # Disable reflection detection entirely
+  passive: false # Disable passive scanning
+```
